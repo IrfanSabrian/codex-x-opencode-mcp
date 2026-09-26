@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyJevRoute, assertAllowedTool, receiptMarker, routeMarker, routePrompt } from '../plugin/jev-gate-core.mjs';
+import { applyJevRoute, assertAllowedTool, receiptMarker, routeMarker, routePrompt, skillDiscoveryFallback } from '../plugin/jev-gate-core.mjs';
 
 const payload = { execution_brief: { objective: 'Read note.txt', requirements: ['Quote it'], acceptance_criteria: ['Exact content'] } };
 
@@ -44,6 +44,24 @@ test('Jev gate retains orchestration decision for full work', async () => {
   assert.equal(route.should_ultrawork, true);
   assert.match(parts[0].text, /ultrawork orchestration/);
   assert.match(parts[0].text, /backend-architect/);
+});
+
+test('empty load_skills invokes the skill-discovery fallback, listed skills do not', async () => {
+  const empty = [{ type: 'text', text: `${routeMarker}${JSON.stringify(payload)}` }];
+  await applyJevRoute(empty, async () => ({
+    complexity: 'standard', skill: 'unspecified-high', is_visual: 0,
+    decision: { category: 'deep', should_ultrawork: false, load_skills: [] }
+  }));
+  assert.match(empty[0].text, /opencode-skill-discovery/);
+  assert.match(empty[0].text, /skills\.sh for general work, ui-skills\.com for UI work/);
+  assert.equal(skillDiscoveryFallback.includes('opencode-skill-discovery'), true);
+
+  const listed = [{ type: 'text', text: `${routeMarker}${JSON.stringify(payload)}` }];
+  await applyJevRoute(listed, async () => ({
+    complexity: 'standard', skill: 'backend-architect', is_visual: 0,
+    decision: { category: 'deep', should_ultrawork: false, load_skills: ['backend-architect'] }
+  }));
+  assert.doesNotMatch(listed[0].text, /opencode-skill-discovery/);
 });
 
 test('quick route blocks delegation tools while ultrawork route permits them', () => {

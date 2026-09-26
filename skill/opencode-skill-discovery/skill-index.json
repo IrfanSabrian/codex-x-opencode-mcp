@@ -1,0 +1,12 @@
+[
+  {
+    "_comment": "TEMPLATE entry — delete this object on first real install and replace with real entries. Shape: slug (global dir name under %USERPROFILE%\\.config\\opencode\\skills\\), name (display name), category (general | ui), source (skills.sh | ui-skills.com), repository (verified author repo URL), installedAt (YYYY-MM-DD), validation (one-line trust-review outcome). JSON has no comments, so this field documents the shape.",
+    "slug": "example-slug",
+    "name": "Example Skill",
+    "category": "general",
+    "source": "skills.sh",
+    "repository": "https://github.com/<owner>/<repo>",
+    "installedAt": "YYYY-MM-DD",
+    "validation": "SKILL.md reviewed; no secrets/override/destructive/hooks"
+  }
+]

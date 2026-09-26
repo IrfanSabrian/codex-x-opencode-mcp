@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url';
 export const routeMarker = 'CODEX_HUB_ROUTE_REQUEST_V1\n';
 export const receiptMarker = 'CODEX_HUB_JEV_RECEIPT_V1 ';
 
+export const skillDiscoveryFallback = 'Jev listed no installed skills for this turn: check the user-global skill index, then follow the opencode-skill-discovery global skill (skills.sh for general work, ui-skills.com for UI work) before executing.';
+
 const categories = new Set(['quick', 'deep', 'ultrabrain', 'visual-engineering']);
 const complexities = new Set(['quick', 'standard', 'full', 'specialist']);
 
@@ -60,8 +62,9 @@ export async function applyJevRoute(parts, decide) {
     : route.should_ultrawork
       ? 'Use Sisyphus ultrawork orchestration and delegate suitable independent work through OMO.'
       : 'Use Sisyphus deep execution; delegate only if the task actually needs it.';
+  const discovery = route.load_skills.length === 0 ? ` ${skillDiscoveryFallback}` : '';
   const planningBoundary = "The Codex brief is authoritative. Prometheus may only divide approved in-scope work among configured agents; it must not change Codex's objective, scope, architecture, or acceptance criteria. If a required choice crosses those boundaries, ask Codex and wait for its decision. Sisyphus executes the Codex-approved task and coordinates the assignments.";
-  part.text = `${receiptMarker}${JSON.stringify(route)}\nJev routing has already run for this hub turn. Do not call Jev again for this turn. ${instruction} ${planningBoundary} Load the listed skills when applicable.\n\n${part.text}`;
+  part.text = `${receiptMarker}${JSON.stringify(route)}\nJev routing has already run for this hub turn. Do not call Jev again for this turn. ${instruction}${discovery} ${planningBoundary} Load the listed skills when applicable.\n\n${part.text}`;
   return route;
 }
 

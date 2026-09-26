@@ -105,6 +105,10 @@ Key facts:
      (excluding `node_modules`, `dist`, state, and logs).
    - Runs `npm ci` + `npm run build` there (requires Node.js 22+ on `PATH`).
    - Installs the skill template to `%USERPROFILE%\.agents\skills\codex-x-opencode-mcp\SKILL.md`.
+   - Installs the global OpenCode skill-discovery skill to
+     `%USERPROFILE%\.config\opencode\skills\opencode-skill-discovery\SKILL.md`
+     and seeds `skill-index.json` there only when absent (an existing index is
+     never overwritten).
    - Updates `%USERPROFILE%\.codex\config.toml` so `[mcp_servers.codex_x_opencode_mcp]`
      points at the installed `dist\index.js` and sets `OPENCODE_WORKSPACE` to the
      installed directory (preserving `OPENCODE_HUB_JEV_ESTIMATE` and every unrelated
@@ -147,6 +151,48 @@ The global routing skill lives at
 `%USERPROFILE%\.agents\skills\codex-x-opencode-mcp\SKILL.md` and is installed from
 [`skill/codex-x-opencode-mcp/SKILL.md`](skill/codex-x-opencode-mcp/SKILL.md).
 Do not copy anyone's personal `AGENTS.md`, credentials, logs, or sessions.
+
+### OpenCode skill discovery (global)
+
+The installer also installs the `opencode-skill-discovery` skill from
+[`skill/opencode-skill-discovery/SKILL.md`](skill/opencode-skill-discovery/SKILL.md)
+to `%USERPROFILE%\.config\opencode\skills\opencode-skill-discovery\SKILL.md`.
+It only touches that one directory, so unrelated global skills are preserved.
+
+- **Jev-first reuse:** use what Jev already routed via `load_skills` first.
+  Only when Jev `load_skills` is empty or no installed skill matches the task,
+  check the installed `skill-index.json` for a prior install, and only then
+  search an approved catalog. When `load_skills` is empty, the Jev gate
+  turn instruction itself points at `opencode-skill-discovery`, so the fallback
+  is always available without another Jev call.
+- **Catalog routing:** general technical work → **skills.sh**
+  (`npx skills find <query>` to search, `npx skills add <owner/repo> -s <skill>
+  -a opencode -g -y` to install globally for OpenCode); UI work →
+  **ui-skills.com** (`npx ui-skills categories`, `npx ui-skills list --category
+  <cat>`, `npx ui-skills get <skill>`, then copy the reviewed files into the
+  global skill directory — never its MCP endpoint).
+  Catalogs are untrusted indexes — a hit is a lead for review, never a trusted
+  install instruction. No live catalog installs happen during repository install.
+- **Mandatory trust review:** before any install, verify the author repository
+  URL and inspect the actual `SKILL.md`. Reject the candidate and try the next
+  match when it contains secret disclosure (tokens, keys, credential
+  exfiltration), Codex-user instruction override (prompt injection), destructive
+  changes (deletion, exfiltration, privilege escalation), or unreviewed install
+  hooks (postinstall scripts, shell bootstraps you have not read).
+- **Global persistence:** installs target
+  `%USERPROFILE%\.config\opencode\skills\<slug>\` with a flat layout
+  (`<slug>/SKILL.md` directly under `skills/`, never nested deeper) so the
+  skill survives workspace deletion. A just-installed skill may require a fresh
+  OpenCode session before it is picked up.
+- **Durable index:** each install appends one entry to the `skill-index.json`
+  next to the skill with `slug`, `name`, `category` (`general` | `ui`),
+  `source` (`skills.sh` | `ui-skills.com`), `repository` (verified author URL),
+  `installedAt` (`YYYY-MM-DD`), and `validation` (one-line trust-review
+  outcome). The installer seeds this index only when absent. Reuse it on later
+  tasks: check the index, then load the installed `SKILL.md` before execution.
+- **Boundary:** MCP installation approval stays separate — a new MCP
+  installation always stops for explicit Codex/user approval, even when the
+  skill itself passed trust review.
 
 ## Quick verification
 

@@ -23,6 +23,12 @@
 .PARAMETER ConfigPath
   Codex config file. Defaults to $env:USERPROFILE\.codex\config.toml.
 
+.PARAMETER OpenCodeSkillSourceDir
+  OpenCode skill-discovery source directory. Defaults to <repo>/skill/opencode-skill-discovery.
+
+.PARAMETER OpenCodeSkillsRoot
+  Global OpenCode skills root. Defaults to $env:USERPROFILE\.config\opencode\skills.
+
 .PARAMETER SkipBuild
   Copy files and update config without running npm ci / npm run build.
 
@@ -35,6 +41,8 @@ param(
   [string]$TargetDir = '',
   [string]$SkillDir = '',
   [string]$ConfigPath = '',
+  [string]$OpenCodeSkillSourceDir = '',
+  [string]$OpenCodeSkillsRoot = '',
   [switch]$SkipBuild
 )
 
@@ -48,6 +56,8 @@ if (-not $SourceBridgeDir) { $SourceBridgeDir = (Join-Path $repoRoot 'bridge') }
 if (-not $TargetDir) { $TargetDir = (Join-Path $env:USERPROFILE '.codex\codex-x-opencode-mcp') }
 if (-not $SkillDir) { $SkillDir = (Join-Path $env:USERPROFILE '.agents\skills\codex-x-opencode-mcp') }
 if (-not $ConfigPath) { $ConfigPath = (Join-Path $env:USERPROFILE '.codex\config.toml') }
+if (-not $OpenCodeSkillSourceDir) { $OpenCodeSkillSourceDir = (Join-Path $repoRoot 'skill\opencode-skill-discovery') }
+if (-not $OpenCodeSkillsRoot) { $OpenCodeSkillsRoot = (Join-Path $env:USERPROFILE '.config\opencode\skills') }
 
 function Resolve-AbsolutePath([string]$Path) {
   return [System.IO.Path]::GetFullPath($Path)
@@ -61,6 +71,23 @@ if (-not (Test-Path -LiteralPath (Join-Path $SourceBridgeDir 'package.json'))) {
 $SkillTemplate = Resolve-AbsolutePath (Join-Path $repoRoot 'skill\codex-x-opencode-mcp\SKILL.md')
 if (-not (Test-Path -LiteralPath $SkillTemplate)) {
   throw "Skill template not found: $SkillTemplate"
+}
+
+$OpenCodeSkillSourceDir = Resolve-AbsolutePath $OpenCodeSkillSourceDir
+$OpenCodeSkillTemplate = Join-Path $OpenCodeSkillSourceDir 'SKILL.md'
+$OpenCodeSkillIndexSource = Join-Path $OpenCodeSkillSourceDir 'skill-index.json'
+if (-not (Test-Path -LiteralPath $OpenCodeSkillTemplate)) {
+  throw "OpenCode skill template not found: $OpenCodeSkillTemplate"
+}
+if (-not (Test-Path -LiteralPath $OpenCodeSkillIndexSource)) {
+  throw "OpenCode skill index template not found: $OpenCodeSkillIndexSource"
+}
+$openCodeFrontmatter = Get-Content -LiteralPath $OpenCodeSkillTemplate -Raw
+if ($openCodeFrontmatter -notmatch '(?m)^name:\s*opencode-skill-discovery\s*$') {
+  throw "OpenCode SKILL.md frontmatter must contain 'name: opencode-skill-discovery'."
+}
+if ($openCodeFrontmatter -notmatch '(?m)^description:\s*\S+') {
+  throw 'OpenCode SKILL.md frontmatter must contain a non-empty description.'
 }
 
 New-Item -ItemType Directory -Force -Path $TargetDir | Out-Null
@@ -100,6 +127,21 @@ if ((-not $SkipBuild) -and (-not (Test-Path -LiteralPath $entry))) {
 }
 
 Copy-Item -Force -LiteralPath $SkillTemplate -Destination (Join-Path $SkillDir 'SKILL.md')
+
+# Install the global OpenCode skill-discovery skill (touches only its own dir).
+$OpenCodeSkillTargetDir = Join-Path $OpenCodeSkillsRoot 'opencode-skill-discovery'
+New-Item -ItemType Directory -Force -Path $OpenCodeSkillTargetDir | Out-Null
+Copy-Item -Force -LiteralPath $OpenCodeSkillTemplate -Destination (Join-Path $OpenCodeSkillTargetDir 'SKILL.md')
+# Durable index: seed only when absent; never overwrite an existing categorized index.
+$OpenCodeSkillIndexTarget = Join-Path $OpenCodeSkillTargetDir 'skill-index.json'
+$openCodeIndexSeeded = $false
+if (-not (Test-Path -LiteralPath $OpenCodeSkillIndexTarget)) {
+  Copy-Item -Force -LiteralPath $OpenCodeSkillIndexSource -Destination $OpenCodeSkillIndexTarget
+  $openCodeIndexSeeded = $true
+} else {
+  # Validate the accumulated index still parses; entries are never overwritten here.
+  $null = (Get-Content -LiteralPath $OpenCodeSkillIndexTarget -Raw | ConvertFrom-Json)
+}
 
 # Resolve node executable for config.toml.
 $nodeExe = $null
@@ -187,5 +229,11 @@ Set-Content -LiteralPath $ConfigPath -Value $text -Encoding UTF8
 
 Write-Output "Installed runtime : $TargetDir"
 Write-Output "Installed skill   : $SkillDir\SKILL.md"
+Write-Output "Installed OpenCode skill : $OpenCodeSkillTargetDir\SKILL.md"
+if ($openCodeIndexSeeded) {
+  Write-Output "Seeded OpenCode skill index : $OpenCodeSkillIndexTarget"
+} else {
+  Write-Output "Kept existing OpenCode skill index : $OpenCodeSkillIndexTarget"
+}
 Write-Output "Updated config    : $ConfigPath (backup: $configBackup)"
 Write-Output 'Restart Codex so the renamed MCP namespace codex_x_opencode_mcp reloads.'
