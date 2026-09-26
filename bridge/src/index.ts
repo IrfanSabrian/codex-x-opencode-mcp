@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   const workspace = process.env.OPENCODE_WORKSPACE;
   if (!workspace) throw new Error('OPENCODE_WORKSPACE is required');
 
-  const stateDir = process.env.OPENCODE_TASK_STATE_DIR ?? join(workspace, '.opencode-bridge-state');
+  const stateDir = process.env.OPENCODE_TASK_STATE_DIR ?? join(workspace, '.codex-x-opencode-mcp');
   const managed = process.env.OPENCODE_BASE_URL ? undefined : await startManagedOpenCode(workspace, join(stateDir, 'routes'));
   const baseURL = process.env.OPENCODE_BASE_URL ?? managed!.baseURL;
   if (managed) process.on('exit', () => managed.close());

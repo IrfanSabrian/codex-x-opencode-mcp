@@ -135,7 +135,7 @@ OPENCODE_HUB_JEV_ESTIMATE = '1'
 
 - `command` is your Node.js executable (detected from `PATH` at install time).
 - `OPENCODE_WORKSPACE` is the durable install directory (task state lives under
-  `.opencode-bridge-state/` inside it). Per-task workspaces still come from each
+  `.codex-x-opencode-mcp/` inside it). Per-task workspaces still come from each
   brief's `workspace_root`.
 - `OPENCODE_HUB_JEV_ESTIMATE=1` enables the genuine Jev Estimate call. Remove it or
   set `0` to go back to `unavailable` estimates.
@@ -210,7 +210,7 @@ git pull
 powershell -ExecutionPolicy Bypass -File scripts\install-windows.ps1
 ```
 
-Then restart Codex. Your task state under `.opencode-bridge-state/` in the install
+Then restart Codex. Your task state under `.codex-x-opencode-mcp/` in the install
 directory is left untouched.
 
 ## Uninstall

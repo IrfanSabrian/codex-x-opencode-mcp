@@ -69,7 +69,7 @@ New-Item -ItemType Directory -Force -Path $SkillDir | Out-Null
 # Copy bridge source, excluding local build output and state.
 # Build a single quoted argument string: Start-Process does not quote
 # array elements, and both paths may contain spaces.
-$robocopyArgString = "`"$SourceBridgeDir`" `"$TargetDir`" /E /NFL /NDL /NJH /NJS /NP /XF *.log /XD node_modules dist .opencode-bridge-state"
+$robocopyArgString = "`"$SourceBridgeDir`" `"$TargetDir`" /E /NFL /NDL /NJH /NJS /NP /XF *.log /XD node_modules dist .codex-x-opencode-mcp"
 $proc = Start-Process -FilePath 'robocopy.exe' -ArgumentList $robocopyArgString -Wait -PassThru
 $exitCode = $proc.ExitCode
 if ($exitCode -ge 8) {

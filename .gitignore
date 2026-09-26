@@ -1,6 +1,6 @@
 bridge/node_modules/
 bridge/dist/
-.opencode-bridge-state/
+.codex-x-opencode-mcp/
 .opencode/
 .omo/
 .codegraph/

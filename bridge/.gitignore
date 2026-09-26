@@ -1,4 +1,4 @@
 node_modules/
 dist/
-.opencode-bridge-state/
+.codex-x-opencode-mcp/
 *.log
