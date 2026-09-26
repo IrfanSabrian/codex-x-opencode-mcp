@@ -1,0 +1,7 @@
+bridge/node_modules/
+bridge/dist/
+.opencode-bridge-state/
+.opencode/
+.omo/
+.codegraph/
+*.log

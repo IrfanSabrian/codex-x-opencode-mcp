@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "scope": "mcp",
+  "source": "OpenCode 1.18.32 effective mcp list, 2026-09-25",
+  "providers": [
+    { "id": "autocad-live", "status": "disabled", "capabilities": ["autocad"] },
+    { "id": "camofox-browser", "status": "disabled", "capabilities": ["browser-automation", "stealth-browser"] },
+    { "id": "chrome-devtools", "status": "connected", "capabilities": ["browser-debugging"] },
+    { "id": "claude-mem-search", "status": "connected", "capabilities": ["memory"] },
+    { "id": "claude-mem:mcp-search", "status": "connected", "capabilities": [], "needs_audit": true },
+    { "id": "codegraph", "status": "connected", "capabilities": ["code-graph"] },
+    { "id": "context7", "status": "connected", "capabilities": ["web-docs"] },
+    { "id": "exa", "status": "connected", "capabilities": ["web-search"] },
+    { "id": "github", "status": "connected", "capabilities": ["repository"] },
+    { "id": "grep_app", "status": "connected", "capabilities": ["code-search"] },
+    { "id": "lsp", "status": "connected", "capabilities": ["language-server"] },
+    { "id": "pencil", "status": "disabled", "capabilities": ["design-editing"] },
+    { "id": "playwright", "status": "connected", "capabilities": ["browser-automation"] },
+    { "id": "websearch", "status": "connected", "capabilities": ["web-search"] }
+  ]
+}

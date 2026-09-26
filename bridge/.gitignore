@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.opencode-bridge-state/
+*.log
