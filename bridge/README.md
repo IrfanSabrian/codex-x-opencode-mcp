@@ -1,98 +1,198 @@
 # Codex ↔ OpenCode bridge
 
-Bridge MCP lokal untuk [PRD](../codex-opencode-execution-hub-prd.md). Codex mengirim satu `Execution Brief`; OpenCode 1.18.32 mengerjakan tugas; Codex mengambil `Result Contract`, diff, dan bukti untuk melakukan quality gate.
+Local MCP bridge for the [PRD](../codex-opencode-execution-hub-prd.md). Codex sends one `Execution Brief`; OpenCode 1.18.32 performs the task; Codex retrieves the `Result Contract`, diff, and evidence to run the quality gate.
 
-`opencode_hub` adalah nama konektor MCP yang didaftarkan ke Codex di mesin ini. Ini bukan aplikasi dengan antarmuka tersendiri. Saat tool tersedia di task Codex baru, Codex dapat mengirim brief lewat `opencode_execute`, memantau `opencode_status`, lalu membaca `opencode_result`. Jika hasil perlu diperbaiki, Codex dapat mengirim `opencode_correct` setelah siklus sebelumnya selesai.
+`codex_x_opencode_mcp` is the name of the MCP connector registered with Codex. It is not an application with its own interface. When the tools are available in a Codex task, Codex can send a brief through `harness_execute`, poll `harness_status`, then read `harness_result`. If the result needs work, Codex sends `harness_correct` after the previous cycle has finished.
 
-## Status saat ini
+## Current status
 
-| Bagian | Kondisi |
+| Area | State |
 | --- | --- |
-| Koneksi Codex ↔ OpenCode, tujuh tool MCP, state tugas, Result Contract | Berfungsi dan diuji langsung |
-| Jev intake pada OpenCode yang dikelola bridge | Hook OpenCode memanggil Jev sebelum Sisyphus, mengirim kategori/skill/ultrawork, dan menulis bukti rute per siklus. Hub menolak hasil tanpa bukti yang cocok; rute `quick` dan `specialist/ultrabrain` diuji langsung. |
-| Koreksi, keputusan, penghentian, serta koneksi MCP yang sudah terpasang | Diimplementasikan dan diuji pada test otomatis; koreksi ditolak saat siklus lama masih berjalan |
-| Validasi independen dan pemulihan proses | Bridge menjalankan rencana validasi atau skrip Node yang tersedia untuk berkas berubah; kegagalan menahan hasil. Tugas yang terputus dilanjutkan sekali pada sesi yang sama. Keduanya diuji langsung. |
-| Jev Decision and Jev Estimate reporting | Bridge shows the original Jev Decision trace when a route is available. After the final result with no pending decisions, bridge shows one Jev Estimate block with absolute Codex tokens saved and context avoided. |
-| Penemuan dan pemasangan MCP baru | Kandidat registry ditandai belum ditinjau. Setelah persetujuan eksplisit untuk kandidat dan versi paket yang tepat, paket npm berversi tetap dapat ditambahkan ke proses OpenCode bridge dan status koneksinya diverifikasi. |
-| Paket non-npm, profil dan izin tool per agen, telemetri lanjutan | Belum diimplementasikan. Laporan token/konteks adalah pengukuran awal, bukan seluruh metrik Phase 8. |
+| Codex ↔ OpenCode connection, seven MCP tools, task state, Result Contract | Working and tested live |
+| Jev intake inside the bridge-managed OpenCode process | The OpenCode hook calls Jev before Sisyphus, sends category/skill/ultrawork, and writes a route receipt per cycle. The hub rejects results without a matching receipt; the `quick` and `specialist/ultrabrain` routes were tested live. |
+| Correction, decision, stop, and already-installed MCP connections | Implemented and covered by automated tests; a correction is rejected while an older cycle is still running |
+| Independent validation and process recovery | The bridge runs the validation plan, or the available Node scripts, for changed files; a failure withholds the result. An interrupted task is resumed once on the same session. Both were tested live. |
+| Jev Decision and Jev Estimate reporting | The bridge shows the original Jev Decision trace when a route is available. After the final result with no pending decisions, the bridge shows one Jev Estimate block with absolute Codex tokens saved and context avoided. |
+| Discovery and installation of new MCPs | Registry candidates are marked as not yet reviewed. After explicit approval of a candidate and its exact package version, a pinned npm package can be added to the bridge's OpenCode process and its connection status is verified. |
+| Non-npm packages, per-agent profiles and tool permissions, advanced telemetry | Not implemented yet. The token/context report is an initial measurement, not the full Phase 8 metric set. |
 
-Hasil OpenCode masih perlu ditinjau Codex terhadap kriteria tugas. Bila belum memenuhi acceptance criteria, Codex mengirim `opencode_correct` dengan kriteria gagal, bukti, dan pengujian ulang spesifik, lalu mengiterasi sampai selesai; implementasi koreksi tidak dikerjakan langsung di Codex. Uji langsung membuktikan alur baca berkas, rute spesialis dengan tiga review paralel, dan penerimaan kontrak hasil; kualitas semua jenis pekerjaan belum diuji.
+OpenCode results still need Codex review against the task criteria. When acceptance criteria are not met, Codex sends `harness_correct` with the failed criteria, evidence, and specific retests, then iterates until done; the correction implementation is never performed inside Codex. Live testing proved the file-read flow, a specialist route with three parallel reviews, and acceptance of a result contract, but not the quality of every kind of work.
 
-### Kesesuaian dengan draw.io
+### Diagram conformance
 
-| Halaman alur | Status implementasi |
+| Flow page | Implementation status |
 | --- | --- |
-| 01, 04, 05: brief → bridge → intake → hasil | Berjalan melalui tujuh tool MCP, sesi OpenCode, status terpisah, dan Result Contract. |
-| 08, 08A, 09: Jev → Sisyphus/OMO | Hook Jev berjalan sebelum giliran OpenCode; rute `quick` dan `specialist/ultrabrain` terbukti lewat sesi nyata. Rute spesialis meluncurkan tiga review OMO paralel. |
-| 06, 07: capability hub dan MCP dinamis | Provider yang tersedia dapat dihubungkan dan dilepas. Kandidat baru dapat ditemukan; npm dengan versi tetap bisa dipasang setelah persetujuan kandidat yang tepat. Audit paket lengkap, registry selain npm, dan profil per agen tetap belum ada. |
-| 11–14: validasi, hasil, quality gate, koreksi | Bridge menjalankan pemeriksaan independen setelah Result Contract, menahan hasil jika gagal, dan menyimpan buktinya. Correction dan decision loop tersedia. Penilaian kriteria yang memerlukan pertimbangan tetap oleh Codex. |
-| 18, 19: batas keamanan dan kontrak bridge | Input divalidasi, server dibatasi ke loopback, auth sementara, hasil besar dibaca sesuai kebutuhan. Sesi dan validasi dapat dipulihkan setelah proses berhenti; isolasi MCP per agen ditunda. |
+| 01, 04, 05: brief → bridge → intake → result | Runs through the seven MCP tools, an OpenCode session, separate status, and the Result Contract. |
+| 08, 08A, 09: Jev → Sisyphus/OMO | The Jev hook runs before the OpenCode turn; the `quick` and `specialist/ultrabrain` routes are proven through real sessions. The specialist route launches three parallel OMO reviews. |
+| 06, 07: capability hub and dynamic MCP | Available providers can be connected and released. New candidates can be discovered; pinned npm versions can be installed after the exact candidate is approved. Full package audit, non-npm registries, and per-agent profiles are still absent. |
+| 11-14: validation, result, quality gate, correction | The bridge runs independent checks after the Result Contract, withholds the result on failure, and stores the evidence. Correction and decision loops are available. Criteria that require judgment remain Codex's call. |
+| 18, 19: security boundary and bridge contract | Input is validated, the server is bound to loopback, auth is temporary, and large results are read on demand. Sessions and validation can be recovered after the process stops; per-agent MCP isolation is deferred. |
 
-## Kondisi implementasi
+## Multi-harness
 
-- Tujuh tool: `opencode_execute`, `opencode_status`, `opencode_result`, `opencode_inspect`, `opencode_correct`, `opencode_decision`, `opencode_stop`.
-- Kontrak brief, correction, decision, dan result divalidasi dengan Zod. Status dan hasil besar diambil terpisah.
-- OpenCode HTTP dipanggil hanya melalui loopback. Secara default bridge menjalankan `opencode serve` 1.18.32 sendiri pada port acak dengan Basic auth sementara. `OPENCODE_BASE_URL` dapat menunjuk server lokal yang sudah berjalan.
-- Setiap prompt memakai endpoint `/session/{id}/message` dalam permintaan latar belakang. `opencode_execute` menunggu trace Jev hingga 15 detik, lalu mengembalikan tanda terima beserta trace jika sudah tersedia; `opencode_status` dapat mengirim trace yang belum sempat dikembalikan. Status terus menunjukkan eksekusi sampai Result Contract tersedia.
-- Pada proses OpenCode yang dikelola bridge, plugin `bridge/plugin/jev-gate.mjs` memanggil `omoRoute()` dari Jev sebelum pesan diteruskan ke Sisyphus. Bridge menyimpan dan mengembalikan trace `Jev Decision` dari formatter Jev tanpa mengubah tampilannya, selain keputusan ringkas untuk routing. Untuk `quick`, panggilan tool delegasi `task`/`delegate_task` ditolak; untuk rute ultrawork, instruksi meminta orkestrasi OMO. Jev yang gagal menghentikan giliran; hasil tanpa bukti rute sesuai nonce dilaporkan `jev_route_missing`. Rute terverifikasi ditambahkan ke `provenance` Result Contract.
-- MCP answers carry the Jev Decision trace as a separate text block exactly as formatted by Jev. When `opencode_result` returns the final result with no pending decisions, that block is followed by the `token_savings.display` block titled `Jev Estimate`, for example `Codex tokens saved: ~1.2k tokens` and `Context avoided: ~5k tokens`. Jev Estimate is a separate operation from Jev Decision and never changes routing. Values under that title come only from a genuine Jev estimate source; without one the bridge reports `Codex tokens saved: unavailable` / `Context avoided: unavailable` instead of inventing numbers or presenting local arithmetic as Jev output. The estimate runs once per parent task final outcome; intermediate cycles, pending decisions, and active tasks produce no estimate. Genuine values are absolute approximate token counts: tokens saved estimates Codex usage avoided by delegating execution, context avoided estimates task/repository context Codex never had to process. Values are marked approximate; context-window capacity is never presented as savings. These metrics are Codex-side context only; OpenCode and Jev token usage stay separate.
-- A genuine source is implemented in `src/jev-estimate-source.ts` (`SystemOneJevEstimator`): it asks the existing Jev SystemOne backend dedicated banded estimate questions (tiny/small/medium/large, mapped to the disclosed representatives 500/3k/12k/40k tokens) with only transcript/payload lengths as grounding, never content. It needs no new MCP/plugin, credential, or backend change, but enabling it adds one live SystemOne call per final task, so it stays OFF by default. Proposed activation, pending explicit user approval: set `OPENCODE_HUB_JEV_ESTIMATE=1` in the bridge process environment and restart the bridge. Until then every estimate reports unavailable.
-- Plugin Jev dipasang hanya lewat konfigurasi inline pada proses OpenCode yang dikelola bridge. Konfigurasi plugin global termasuk OMO tetap digabung oleh OpenCode. Opsi `OPENCODE_PURE=1` ditolak karena mematikan plugin. OpenCode Desktop biasa tidak memakai gerbang ini.
-- Registry memetakan 14 MCP yang teramati saat audit. Capability manager membaca status runtime, menghubungkan provider terpasang yang dibutuhkan, dan melepas koneksi yang dibukanya setelah siklus selesai. Provider yang sudah terhubung sebelum tugas tidak diputus.
-- Jika kapabilitas belum tersedia, bridge mencari kandidat di [MCP Registry resmi](https://registry.modelcontextprotocol.io/docs) dan mengembalikan metadata berstatus `unreviewed`. Codex menampilkan kandidat, sumber, versi, dan perintah yang akan dijalankan kepada pengguna. Setelah persetujuan eksplisit, Codex mengulang `opencode_execute` dengan `approved_mcp_installation_keys`; bridge mencari ulang kandidat dan memastikan kuncinya masih cocok dengan capability, server, paket, dan versi yang disetujui.
-- Untuk kandidat dengan paket npm dan versi semver tetap, bridge membangun perintah terbatas `npx --yes <paket>@<versi>` lalu mendaftarkannya melalui endpoint MCP dinamis OpenCode. Bridge memeriksa status koneksi sebelum memulai task. Ia tidak menjalankan perintah bebas dari metadata registry. Paket registry lain, versi yang tidak tetap, dan kebutuhan konfigurasi rahasia memerlukan penanganan manual.
-- Persetujuan dan konfigurasi MCP yang ditambahkan disimpan tanpa kredensial di `.codex-x-opencode-mcp/mcp-installations.json`. Provider dipasang hanya pada proses OpenCode headless yang dikelola bridge, bukan konfigurasi OpenCode Desktop/global. Koneksi yang dibuka bridge dilepas setelah task selesai; konfigurasi provider yang sudah disetujui tetap tersedia untuk task berikutnya dan dapat didaftarkan ulang setelah proses dimulai ulang.
-- State tugas menyimpan ID sesi, permintaan siklus terakhir, rencana/hasil validasi, dan hitungan pemulihan di `.codex-x-opencode-mcp/`; transkrip tetap berada di sesi OpenCode. Direktori state masuk `.gitignore` karena brief bisa berisi konteks sensitif. Bukti Jev termasuk trace format asli disimpan di subdirektori `routes/` dan dapat dipulihkan dari transkrip sesi.
-- Setelah Result Contract muncul, bridge menjalankan `validation_plan` jika dicantumkan di brief. Setiap langkah menentukan jenis pemeriksaan, executable, argumen, direktori kerja relatif, dan batas waktu; perintah dijalankan tanpa shell dan direktori kerja harus berada di workspace. Jika tidak ada rencana dan hasil menyebut berkas berubah dalam proyek Node, bridge menjalankan skrip `typecheck`, `lint`, `test`, dan `build` yang tersedia di `package.json` terdekat. Pemeriksaan yang tidak tersedia dicatat sebagai `not_run`; kegagalan menghasilkan `validation_failed` dan bukti untuk `opencode_correct`.
-- Saat bridge mulai lagi, tugas aktif yang tersimpan direkonsiliasi dengan sesi OpenCode. Hasil yang sudah ada dipakai tanpa mengirim ulang tugas. Jika belum ada hasil dan sesi diam, bridge mengirim satu permintaan lanjutan pada sesi yang sama dengan instruksi memeriksa pekerjaan yang sudah dilakukan. Validasi yang terputus dijalankan lagi. Pemulihan dibatasi satu percobaan otomatis per siklus.
-- Binding aktif Sisyphus, Prometheus, dan Momus memakai Muse Spark 1.3. Proses OpenCode yang dikelola bridge menonaktifkan rute 9router Jev dan memakai rute TypeSafe yang sudah dikonfigurasi.
-- Helper murni penemuan skill di `src/skill-discovery.ts` (`decideSkillSource`, `emptyOrNoMatch`, `reviewSkillCandidate`, `buildIndexEntry`, `findReuse`) beserta `test/skill-discovery.test.ts` mencakup routing katalog general-vs-UI, pemicu discovery saat Jev kosong/tidak cocok, aturan trust-review (tolak secret/override/destruktif/hook), bentuk entri indeks, dan reuse dari indeks yang sudah ada.
+The OpenCode adapter is the default execution harness, but the bridge can drive any of
+five agent runtimes through one task interface. Each task records which harness executed
+it (`harness_id` in the task state), so recovery, status, corrections, decisions, and
+stop always resolve to that same harness and never hand a task to a different CLI.
 
-## Menjalankan
+| Harness | Adapter | License | Notes |
+| --- | --- | --- | --- |
+| OpenCode | `src/harness/opencode.ts` | MIT | Default. Managed `opencode serve` process, structured output via prompts, Jev gate plugin. |
+| Codex CLI | `src/harness/codex-cli.ts` | Apache-2.0 | `codex exec` with schema file, result file, and native session resume. |
+| Claude Code | `src/harness/claude-code.ts` | Proprietary; use under the Anthropic terms of service | `claude -p --output-format stream-json`, per-cycle usage, native resume. |
+| Cursor CLI | `src/harness/cursor.ts` | Proprietary; use under the Cursor terms of service | `agent -p --output-format json`; no session resume, so the next cycle replays the transcript. |
+| Copilot CLI | `src/harness/copilot-cli.ts` | Proprietary; requires a Copilot subscription | `copilot -p "<prompt>"`; no resume, no structured output, one repair turn per cycle. |
+| Command Code | `src/harness/commandcode.ts` | Proprietary (npm `command-code`) | `commandcode -p` with `--output-format json` NDJSON, `finalText` + usage, `--resume <sessionId>`. Edits need `permission_mode` (`accept-edits`, `dont-ask`, `yolo`). |
 
-Butuh Node.js 22 atau lebih baru dan OpenCode 1.18.32. Di folder `bridge`:
+The bridge only invokes the CLIs you already installed and authenticated; it never
+installs, updates, or provisions a harness or its credentials.
+
+OpenCode is launched only when it is enabled and either the default harness, part of
+`harness.fallback`, or reached through `OPENCODE_BASE_URL`. A deployment routed to a CLI
+harness therefore starts with no OpenCode install at all.
+
+### harness.config.json
+
+`bridge/harness.config.json` (validated by `harnessConfigSchema`, documented by
+`bridge/harness.config.schema.json`) selects what runs:
+
+- `harness.default` and `harness.fallback`: the ordered harness list. The default runs
+  first; a disabled or missing binary falls back to the next enabled entry.
+- `harness.routing.by_mode`: maps a task mode to a model tier (`cheap`, `standard`,
+  `strong`); `escalate_on`/`escalate_to` raise the tier after specific failures.
+- `limits`: per-cycle timeout, first-output timeout, parallel tasks,
+  `max_cost_usd_per_task` (the accumulated reported cost of one task; passing it fails
+  the task with `budget_exceeded`), stdout cap, and inline prompt cap.
+- `harnesses`: per-harness entries with `enabled`, `binary`, model bindings per tier,
+  and vendor options (sandbox, permission mode, allowed tools, auth env).
+- `orchestration`: the protocol injected into every cycle prompt. `profile` is
+  `orchestrated`, `minimal`, or `off`; `max_parallel_agents` caps concurrent assignments;
+  `role_names` renames any role; `role_models` pins a role to a model tier, resolved
+  against the selected harness's own `models` block.
+
+Auth keys are referenced by environment variable name only: `CODEX_API_KEY`,
+`ANTHROPIC_API_KEY`, `CURSOR_API_KEY`, `GITHUB_TOKEN`. No secret value is ever written
+to the config.
+
+### Orchestration protocol
+
+`src/orchestration.ts` renders one protocol block that `Hub.submit` prepends to every
+cycle prompt, for resumable and replay harnesses alike. Roles are generic:
+`orchestrator`, `intake`, `planner`, `plan-reviewer`, `implementer`, `researcher`,
+`reviewer`, `tester`, `advisor`, `inspector`. The sequence is intake, plan, plan review,
+bounded delegation, smallest change, real verification, independent diff review, iterate
+until green, stop only for an orchestrator decision, report only evidence.
+
+The pattern is inspired by OMO's orchestration model, but the bridge bundles no OMO code
+and no vendor role name belongs to the contract. Override `role_names` to match your
+team's vocabulary; a single-agent harness runs the same sequence itself and says so in
+the summary.
+
+How each harness can act on the roles:
+
+| Harness | Subagent mechanism | Role models |
+| --- | --- | --- |
+| OpenCode | `task` tool plus configured agents | per-agent `model` |
+| Claude Code | Task tool subagents | inherited or per-subagent model |
+| Command Code | `agent` tool plus `.commandcode/agents/*.md` | `model` in agent frontmatter |
+| Codex CLI | single agent per cycle | task model only |
+| Cursor CLI | single agent per cycle | task model only |
+| Copilot CLI | single agent per cycle | task model only |
+
+The protocol line names the model per role, so a harness with subagents can bind them
+directly, and a single-agent harness keeps the same sequence without inventing agents it
+cannot run.
+
+### Pure mode
+
+`pure_mode: true` (the default) makes the OMO/Jev tooling optional. The bridge then
+chooses the harness itself, `route_receipts_required` defaults to `false`, and results
+carry `routing:unrouted` plus `harness:<id>`, `model:<id|harness-default>`, and
+`tier:<tier>` in `provenance` instead of a Jev trace. No token-savings block is
+produced. Enabling Jev routing stays possible by installing and configuring OMO/Jev
+yourself and setting `route_receipts_required: true`.
+
+### License and bundling note
+
+OMO is licensed SUL-1.0 and is NOT bundled with this bridge. If you want Jev routing and
+the OMO orchestration routes, you install and configure OMO yourself; the bridge never
+assumes it exists. In pure mode nothing outside the five CLI adapters above is needed.
+
+### Process security
+
+Every harness adapter runs the configured binary through a fixed argv array: no
+`shell: true`, no string concatenation into a shell. Each harness inherits only an
+explicit per-harness allowlist of environment keys plus the bridge's own variables, so a
+harness cannot read unrelated secrets. A running cycle is cancelled by killing the whole
+process tree, so child processes spawned by the CLI do not outlive a stop or timeout.
+
+## Implementation details
+
+- Seven tools: `harness_execute`, `harness_status`, `harness_result`, `harness_inspect`, `harness_correct`, `harness_decision`, `harness_stop`.
+- Brief, correction, decision, and result contracts are validated with Zod. Status and large results are fetched separately.
+- The OpenCode HTTP API is called through loopback only. By default the bridge starts its own `opencode serve` 1.18.32 on a random port with temporary Basic auth. `OPENCODE_BASE_URL` can point at an already-running local server.
+- Every prompt uses the `/session/{id}/message` endpoint in a background request. `harness_execute` waits up to 15 seconds for the Jev trace, then returns a receipt together with the trace when it is already available; `harness_status` can deliver a trace that was not ready in time. Status keeps reporting execution until the Result Contract exists.
+- In a bridge-managed OpenCode process, the plugin `bridge/plugin/jev-gate.mjs` calls `omoRoute()` from Jev before the message reaches Sisyphus. The bridge stores and returns the `Jev Decision` trace from the Jev formatter without altering its presentation, plus a compact decision for routing. For `quick`, delegation tool calls (`task`/`delegate_task`) are rejected; for the ultrawork route, the instructions request OMO orchestration. A failing Jev stops the turn; a result without route evidence matching the nonce is reported as `jev_route_missing`. Verified routes are added to the Result Contract `provenance`.
+- MCP answers carry the Jev Decision trace as a separate text block exactly as formatted by Jev. When `harness_result` returns the final result with no pending decisions, that block is followed by the `token_savings.display` block titled `Jev Estimate`, for example `Codex tokens saved: ~1.2k tokens` and `Context avoided: ~5k tokens`. Jev Estimate is a separate operation from Jev Decision and never changes routing. Values under that title come only from a genuine Jev estimate source; without one the bridge reports `Codex tokens saved: unavailable` / `Context avoided: unavailable` instead of inventing numbers or presenting local arithmetic as Jev output. The estimate runs once per parent task final outcome; intermediate cycles, pending decisions, and active tasks produce no estimate. Genuine values are absolute approximate token counts: tokens saved estimates Codex usage avoided by delegating execution, context avoided estimates task/repository context Codex never had to process. Values are marked approximate; context-window capacity is never presented as savings. These metrics are Codex-side context only; OpenCode and Jev token usage stay separate.
+- A genuine source is implemented in `src/jev-estimate-source.ts` (`SystemOneJevEstimator`): it asks the existing Jev SystemOne backend dedicated banded estimate questions (tiny/small/medium/large, mapped to the disclosed representatives 500/3k/12k/40k tokens) with only transcript/payload lengths as grounding, never content. It needs no new MCP/plugin, credential, or backend change, but enabling it adds one live SystemOne call per final task, so it stays OFF by default. Proposed activation, pending explicit user approval: set `codex_x_opencode_mcp_JEV_ESTIMATE=1` in the bridge process environment and restart the bridge. Until then every estimate reports unavailable.
+- The Jev plugin is installed only through inline configuration on the bridge-managed OpenCode process. Global plugin configuration, including OMO, is still merged by OpenCode. The `OPENCODE_PURE=1` option is rejected because it disables plugins. A regular OpenCode Desktop process does not use this gate.
+- The registry maps the MCPs observed during the audit. The capability manager reads runtime status, connects the installed providers a task needs, and releases the connections it opened once the cycle is finished. Providers that were already connected before the task are left untouched.
+- The generic `read_files`/`edit_files` capabilities are OpenCode-native and need no external MCP provider. The capability manager (`src/capabilities.ts`, `src/capability-manager.ts`) resolves them directly through OpenCode built-in tools over the task workspace; no MCP status call, registry lookup, or installation happens for them. The `bridge/config/registry.json` file is only for external MCP providers.
+- When a capability is missing, the bridge searches for candidates in the [official MCP Registry](https://registry.modelcontextprotocol.io/docs) and returns metadata marked `unreviewed`. If the registry returns no installable candidate, the `capability_unavailable` response includes `reason: no_registry_candidates`, an explanation, and an actionable `next_action`, without implying an installation path that does not exist. Codex shows the candidate, source, version, and the command that would run. After explicit approval, Codex repeats `harness_execute` with `approved_mcp_installation_keys`; the bridge looks the candidate up again and verifies that the key still matches the approved capability, server, package, and version.
+- For candidates with an npm package at a pinned semver version, the bridge builds a restricted `npx --yes <package>@<version>` command and registers it through the OpenCode dynamic MCP endpoint. The bridge checks connection status before starting the task. It never runs arbitrary commands from registry metadata. Other registry packages, floating versions, and secret configuration still need manual handling.
+- Approved installations and their configuration are stored without credentials in `.codex-x-opencode-mcp/mcp-installations.json`. A provider is installed only on the bridge-managed headless OpenCode process, not in the Desktop/global OpenCode configuration. Connections opened by the bridge are released after the task; the approved provider configuration remains available for later tasks and can be registered again after a restart.
+- Task state stores the session ID, the last cycle request, the validation plan/result, and the recovery count under `.codex-x-opencode-mcp/`; transcripts stay in the OpenCode session. The state directory is git-ignored because briefs can contain sensitive context. Jev evidence, including the original trace, is stored in the `routes/` subdirectory and can be recovered from the session transcript.
+- After the Result Contract appears, the bridge runs `validation_plan` when the brief provides one. Each step defines the check type, executable, arguments, relative working directory, and timeout; commands run without a shell and the working directory must stay inside the workspace. Without a plan, when the result reports changed files in a Node project, the bridge runs the `typecheck`, `lint`, `test`, and `build` scripts available in the nearest `package.json`. Unavailable checks are recorded as `not_run`; a failure produces `validation_failed` plus evidence for `harness_correct`.
+- When the bridge restarts, stored active tasks are reconciled with their OpenCode sessions. An existing result is reused without resending the task. When there is no result yet and the session is idle, the bridge sends one follow-up request on the same session asking the agent to inspect the work already done. Interrupted validation runs again. Recovery is limited to one automatic attempt per cycle.
+- When Jev routing is enabled, the bridge-managed OpenCode process disables the 9router route and uses the configured TypeSafe route. Agent name bindings are left to your own OMO configuration; the bridge never reads or rewrites them.
+- The pure skill-discovery helpers in `src/skill-discovery.ts` (`decideSkillSource`, `emptyOrNoMatch`, `reviewSkillCandidate`, `buildIndexEntry`, `findReuse`) and `test/skill-discovery.test.ts` cover general-vs-UI catalog routing, the discovery trigger when Jev returns nothing or no match, the trust-review rules (reject secrets/overrides/destructive behavior/hooks), the index entry shape, and reuse from an existing index.
+
+## Running
+
+Requires Node.js 22 or newer and at least one configured harness: OpenCode 1.18.32 by
+default, or one of the CLI harnesses. Inside the `bridge` folder:
 
 ```powershell
 npm ci
 npm run build
-$env:OPENCODE_WORKSPACE = 'E:\Project\Codex X Opencode MCP'
+$env:BRIDGE_WORKSPACE = '<workspace-root>'
 node dist/index.js
 ```
 
-`stdout` adalah kanal protokol MCP. Gunakan klien MCP untuk menguji server; jangan mengetik permintaan langsung ke terminal tersebut. Untuk server OpenCode yang sudah berjalan, set `OPENCODE_BASE_URL` dan, jika server memakai Basic auth, `OPENCODE_SERVER_USERNAME` serta `OPENCODE_SERVER_PASSWORD` di lingkungan proses. Jangan menyimpan password dalam config Codex.
+`stdout` is the MCP protocol channel. Test the server through an MCP client; do not type requests into that terminal. To use an already-running OpenCode server, set `OPENCODE_BASE_URL` and, when the server uses Basic auth, `OPENCODE_SERVER_USERNAME` and `OPENCODE_SERVER_PASSWORD` in the process environment. Never store passwords in the Codex config.
 
-Pada mesin ini bridge sudah terdaftar di Codex sebagai `opencode_hub`. Buka task Codex baru agar daftar tool MCP yang baru didaftarkan dimuat.
+The bridge is registered in Codex as `codex_x_opencode_mcp`. Open a new Codex task so the newly registered MCP tool list is loaded.
 
-Jalankan verifikasi dengan `npm test`, `npm run lint`, `npm run build`, dan `npm audit --audit-level=high`. `node scripts/stdio-smoke.mjs` memeriksa handshake dan tujuh tool MCP. `node scripts/live-smoke.mjs` mengirim satu tugas baca berkas ke model OpenCode; `node scripts/interruption-smoke.mjs` menghentikan dan menyalakan ulang server di tengah tugas. Keduanya dapat memakai token provider OpenCode.
+Run the checks with `npm test`, `npm run lint`, `npm run build`, and `npm audit --audit-level=high`. `node scripts/stdio-smoke.mjs` verifies the handshake and the seven MCP tools. `node scripts/live-smoke.mjs` sends one file-read task to the OpenCode model; `node scripts/interruption-smoke.mjs` stops and restarts the server in the middle of a task. Both can consume tokens from your OpenCode provider.
 
-## Batas saat ini
+## Current limits
 
-- Penemuan kandidat MCP membaca metadata dari registry resmi. Metadata tetap tidak tepercaya dan perlu ditinjau untuk penerbit, lisensi, izin, kredensial, daftar tool, serta dampak filesystem/jaringan sebelum persetujuan. Bridge hanya memasang paket npm dengan versi tetap dan memakai argumen yang dibangun sendiri; paket lain berhenti sebagai usulan manual.
-- Untuk kandidat yang didukung, alur persetujuan, pemasangan pada runtime OpenCode, pemeriksaan koneksi, lease, dan pelepasan koneksi sudah diterapkan. Instalasi hanya berlaku di server bridge-managed; installer npm tetap menjalankan kode paket yang dipilih setelah pengguna menyetujui kandidat dan versi.
-- Koneksi MCP OpenCode berlaku pada proses server, sehingga lease bridge tidak memberi isolasi tool per agen. Batas izin agen tetap harus ditegakkan oleh konfigurasi OpenCode/OMO.
-- Uji langsung rute `specialist/ultrabrain` menghasilkan tiga review OMO paralel dan Result Contract valid. Ini membuktikan satu skenario, bukan jaminan perilaku semua tugas `full`, `specialist`, atau visual.
-- Jika `OPENCODE_BASE_URL` menunjuk server OpenCode eksternal, pengelola server harus memasang hook dan menyediakan `OPENCODE_HUB_ROUTE_DIR` agar hub dapat memverifikasi bukti Jev. Tanpa direktori itu, pemeriksaan bukti rute tidak aktif.
-- Workspace ditentukan oleh `workspace_root` absolut pada setiap Execution Brief. Bridge memcanonicalize path itu, memastikan directory ada, dan menolak brief tanpa workspace valid sebelum sesi OpenCode dibuat. Semua operasi sesi, capability, validasi, dan recovery task itu berjalan pada workspace tersebut melalui parameter `directory` per request HTTP OpenCode 1.18.32. Record task lama tanpa workspace gagal fail-closed (`workspace_missing`) dan tidak pernah dialihkan ke workspace lain.
-- `OPENCODE_WORKSPACE` saat bridge mulai hanya menentukan lokasi state (`.codex-x-opencode-mcp/`) dan scope default; ia bukan lagi penentu workspace task. Untuk proyek lain tidak perlu menjalankan bridge terpisah selama setiap brief membawa `workspace_root` yang benar.
-- Pemulihan otomatis memakai sesi dan workspace yang sama. Agen diminta memeriksa state sebelum melanjutkan, tetapi efek samping eksternal yang tidak idempoten tetap memerlukan peninjauan; setelah satu percobaan gagal, tugas meminta koreksi. Lease MCP lama yang hanya ada di memori belum dipulihkan, sejalan dengan penundaan pekerjaan MCP.
-- Tugas tanpa Result Contract setelah 30 menit sejak awal siklus dinyatakan gagal; jika kontrak valid tiba kemudian, status dapat pulih. Status tidak lagi gagal hanya karena agen latar belakang diam selama 10 detik.
-- Bridge memverifikasi keluaran perintah yang dijalankannya sendiri. Kriteria penerimaan yang bersifat semantik tetap dinilai Codex dari hasil, diff, dan bukti. Jika tidak ada rencana validasi maupun skrip proyek yang relevan, laporan bridge adalah `not_run` dan tidak dianggap bukti tes lulus.
-- Pada OpenCode 1.18.32 yang diuji, `prompt_async` kadang tidak menghasilkan jawaban, sementara `format: json_schema` menyebabkan pembacaan pesan sesi gagal HTTP 400. Karena itu bridge memakai `/message`, meminta JSON melalui prompt, memvalidasi hasil dengan Zod, dan menormalkan deskripsi tunggal atau objek kosong pada kolom daftar bila aman. Hasil yang tetap tidak sesuai kontrak dilaporkan sebagai kegagalan.
+- MCP candidate discovery reads metadata from the official registry. That metadata stays untrusted and needs review for publisher, license, permissions, credentials, tool list, and filesystem/network impact before approval. The bridge installs only pinned npm packages using arguments it builds itself; other packages stop as a manual proposal.
+- For supported candidates, the approval flow, installation into the OpenCode runtime, connection check, lease, and connection release are implemented. Installation applies only to the bridge-managed server; the npm installer still executes the chosen package code once the user approves the candidate and version.
+- The OpenCode MCP connection applies to the server process, so a bridge lease gives no per-agent tool isolation. Agent permission boundaries still have to be enforced by the OpenCode/OMO configuration.
+- Live testing of the `specialist/ultrabrain` route produced three parallel OMO reviews and a valid Result Contract. That proves one scenario, not the behavior of every `full`, `specialist`, or visual task.
+- When `OPENCODE_BASE_URL` points at an external OpenCode server, the server operator must install the hook and provide `codex_x_opencode_mcp_ROUTE_DIR` so the hub can verify Jev evidence. Without that directory, route evidence verification is inactive.
+- The workspace is determined by the absolute `workspace_root` in every Execution Brief. The bridge canonicalizes that path, verifies the directory exists, and rejects a brief without a valid workspace before any OpenCode session is created. All session, capability, validation, and recovery operations for that task run in that workspace through the `directory` parameter on each OpenCode 1.18.32 HTTP request. Old task records without a workspace fail closed (`workspace_missing`) and are never redirected to another workspace.
+- `OPENCODE_WORKSPACE` at bridge startup only sets the state location (`.codex-x-opencode-mcp/`) and the default scope; it no longer determines the task workspace. Other projects do not need a separate bridge instance as long as each brief carries the correct `workspace_root`.
+- Automatic recovery reuses the same session and workspace. The agent is told to inspect state before continuing, but non-idempotent external side effects still need review; after one failed attempt the task asks for a correction. Old MCP leases that exist only in memory are not recovered, which matches the deferred MCP work.
+- A task without a Result Contract 30 minutes after the cycle starts is marked failed; a valid contract arriving later can still recover the status. Status no longer fails just because the background agent stayed quiet for 10 seconds.
+- The bridge verifies output from the commands it runs itself. Semantic acceptance criteria are still judged by Codex from the result, diff, and evidence. When there is neither a validation plan nor a relevant project script, the bridge reports `not_run` and that is not evidence of passing tests.
+- On the tested OpenCode 1.18.32, `prompt_async` sometimes produced no answer, while `format: json_schema` made session message reads fail with HTTP 400. The bridge therefore uses `/message`, requests JSON through the prompt, validates the result with Zod, and normalizes a single description or empty object in list fields when that is safe. Results that still violate the contract are reported as failures.
 
-## Protokol dan pembagian keputusan
+## Protocol and decision split
 
-`opencode_hub` adalah **MCP server lokal** yang menyediakan tujuh tool kontrol kepada Codex. Bridge berbicara ke OpenCode melalui HTTP loopback. Plugin `jev-gate.mjs` adalah komponen plugin OpenCode terpisah yang menjalankan Jev dan menyimpan bukti rute. Jadi keseluruhan hub bukan plugin OpenCode; MCP adalah konektor Codex, sementara plugin Jev adalah hook runtime OpenCode.
+`codex_x_opencode_mcp` is a **local MCP server** that exposes seven control tools to Codex. The bridge talks to OpenCode over loopback HTTP. The `jev-gate.mjs` plugin is a separate OpenCode plugin component that runs Jev and stores route evidence. The hub as a whole is therefore not an OpenCode plugin; MCP is the Codex connector, while the Jev plugin is an OpenCode runtime hook.
 
-ACP yang dimaksud di dokumentasi OpenCode adalah **Agent Client Protocol**. ACP memungkinkan editor atau klien kompatibel menjalankan OpenCode sebagai coding agent melalui proses `opencode acp`. ACP menghubungkan editor ke agent; MCP menghubungkan host AI ke tool server. Untuk workflow ini MCP tetap jalur yang tepat karena Codex perlu memanggil kontrak task/status/result/decision milik bridge. ACP tidak menggantikan kontrak atau otomatis membuat Codex pemegang keputusan. Bridge ini belum memakai ACP.
+ACP in the OpenCode documentation means **Agent Client Protocol**. ACP lets an editor or compatible client run OpenCode as a coding agent through the `opencode acp` process. ACP connects an editor to an agent; MCP connects an AI host to a tool server. For this workflow MCP remains the correct path because Codex needs to call the bridge's task/status/result/decision contract. ACP does not replace that contract and does not make Codex the decision holder by itself. This bridge does not use ACP.
 
-Codex mengirim tujuan, scope, keputusan arsitektur, batasan, dan kriteria penerimaan. Planner OpenCode seperti Prometheus hanya membagi pekerjaan yang disetujui menjadi subtask dan memilih agent untuk tiap subtask. Jika OpenCode membutuhkan keputusan di luar brief, bridge mengembalikan pertanyaan serta pilihan. Codex menjawab sendiri bila brief sudah cukup; jika keputusan memerlukan preferensi pengguna, Codex memakai pilihan interaktif dengan input teks bebas dan menunggu jawaban sebelum mengirim `opencode_decision`. Batas tunggu lima menit sejak pilihan ditampilkan: diam lima menit penuh berarti Codex memilih opsi rekomendasi yang paling sesuai brief, memberi tahu pengguna tentang fallback beserta alasannya, lalu meneruskan pilihan. Setiap pesan pengguna mereset timer. Pertanyaan lanjutan dari pengguna dijawab sambil keputusan tetap menunggu.
+Codex sends the objective, scope, architecture decisions, constraints, and acceptance criteria. The harness planner only divides approved work into subtasks and picks an agent for each subtask. If OpenCode needs a decision outside the brief, the bridge returns the question together with the options. Codex answers on its own when the brief is sufficient; when the decision depends on user preference, Codex uses interactive choices with free-text input and waits for the answer before sending `harness_decision`. The wait limit is five minutes from the moment the choices are shown: five full minutes of silence means Codex selects the recommended option that best fits the brief, tells the user about the fallback and its reason, then forwards the choice. Any user message resets the timer. Follow-up questions from the user are answered while the decision stays pending.
 
-Every MCP response that routes Jev shows the `Jev Decision` block exactly as the receipt formatter produced it. On the final result only, it is followed by the `Jev Estimate` block with `Codex tokens saved` and `Context avoided` lines in absolute tokens. The numbers are computed deterministically by `src/reporting.ts` from characters/4 of the full transcript versus the compact Codex payload; the agent never invents numbers.
+Every MCP response that routes through Jev shows the `Jev Decision` block exactly as the receipt formatter produced it. On the final result only, it is followed by the `Jev Estimate` block with `Codex tokens saved` and `Context avoided` lines in absolute tokens. The numbers are computed deterministically by `src/reporting.ts` from characters/4 of the full transcript versus the compact Codex payload; the agent never invents numbers.
 
-Aturan Codex global di `C:\Users\LOQ\.codex\AGENTS.md` mewajibkan setiap task kerja memakai `opencode_hub`, termasuk task kecil. Percakapan dan penjelasan biasa dapat dijawab langsung. Jika bridge tidak tersedia, Codex harus menjelaskan kendalanya dan tidak diam-diam mengerjakan task sendiri.
+The global Codex rules in `<user-home>\.codex\AGENTS.md` make bridge use opt-in per request. By default Codex handles requests directly. The bridge is used only when the user explicitly asks for Codex X OpenCode/OpenCode for that request. If the bridge is unavailable or stale for a delegated task, Codex first tries managed recovery/restart when possible; if it stays blocked, Codex explains the blocker and never silently takes the task over.
 
-## Memindahkan ke laptop lain
+## Moving to another machine
 
-Bisa, tetapi konfigurasi saat ini belum portabel satu klik karena Codex MCP menunjuk ke path lokal. Laptop baru memerlukan Node.js 22+, OpenCode 1.18.32 yang sudah terautentikasi dan dikonfigurasi dengan OMO, Jev, agent, serta binding model yang dipakai, lalu bridge perlu dipasang (`npm ci` dan `npm run build`) dan didaftarkan ulang di konfigurasi Codex dengan path serta workspace laptop tersebut. Salin juga aturan global Codex agar routing otomatis tetap berlaku. Jangan salin credential mentah; autentikasi ulang provider di laptop baru.
+It works, but the current configuration is not one-click portable because the Codex MCP entry points at a local path. A new machine needs Node.js 22+, an authenticated OpenCode 1.18.32 configured with the OMO, Jev, agents, and model bindings in use, then the bridge must be installed (`npm ci` and `npm run build`) and registered again in the Codex config with that machine's paths and workspace. Copy the global Codex rules as well so bridge use stays opt-in. Do not copy raw credentials; re-authenticate the providers on the new machine.
 
-File konfigurasi OpenCode saat audit mengandung kredensial yang ditulis langsung. Jangan menyalin file itu ke workspace atau log bridge; rotasi kredensial tersebut perlu dilakukan pada sisi layanan terkait.
+The OpenCode configuration observed during the audit contained credentials written inline. Do not copy that file into the workspace or into bridge logs; rotate those credentials on the relevant service side.

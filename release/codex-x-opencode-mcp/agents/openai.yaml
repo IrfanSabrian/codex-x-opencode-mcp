@@ -1,0 +1,17 @@
+name: codex-x-opencode-mcp
+version: 1.0.0
+description: Delegate coding work from Codex to a local OpenCode runtime over an MCP bridge, keeping architecture decisions and final review in Codex.
+entrypoint: SKILL.md
+license: MIT
+homepage: https://github.com/IrfanSabrian/codex-x-opencode-mcp
+tags:
+  - mcp
+  - bridge
+  - codex
+  - opencode
+  - delegation
+requires:
+  os: windows
+  node: ">=22"
+  packages:
+    - opencode@1.18.32

@@ -1,4 +1,4 @@
-import { loadCapabilityRegistry, type CapabilityRegistry } from './capabilities.js';
+import { isNativeCapability, loadCapabilityRegistry, type CapabilityRegistry } from './capabilities.js';
 import type { McpCandidate, McpDiscovery, McpInstallOption } from './discovery.js';
 import { npmInstallOption } from './discovery.js';
 import {
@@ -174,6 +174,14 @@ export class CapabilityManager {
 
       const uniqueCapabilities = [...new Set(capabilities.map(capability => capability.trim().toLowerCase()))];
       if (uniqueCapabilities.some(capability => !capability)) throw new Error('Capability is required');
+      const mcpCapabilities = uniqueCapabilities.filter(capability => !isNativeCapability(capability));
+      if (mcpCapabilities.length === 0) {
+        if (approvedInstallationKeys.length) {
+          throw new McpInstallApprovalError('MCP installation approval is unused because all requested capabilities are already available');
+        }
+        this.leases.set(taskID, new Set());
+        return { task_id: taskID, providers: [], newly_connected: [] };
+      }
       const statuses = await this.api.statuses();
       const storedInstallations = await this.installations?.list() ?? [];
       const selected = new Set<string>();
@@ -182,7 +190,7 @@ export class CapabilityManager {
       const restoreFailures = new Set<string>();
 
       try {
-      for (const capability of uniqueCapabilities) {
+      for (const capability of mcpCapabilities) {
         const staticProviders = this.registry.providers.filter(provider => provider.capabilities.includes(capability));
         const savedProviders = storedInstallations.filter(provider => provider.capability === capability);
         const hasUsableStaticProvider = staticProviders.some(provider => !provider.needs_audit &&

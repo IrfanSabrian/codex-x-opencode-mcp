@@ -1,21 +1,36 @@
 # codex-x-opencode-mcp
 
-Local MCP bridge that makes **Codex** the executive reasoning layer and **OpenCode** the execution hub.
+Local MCP bridge that makes **Codex** the executive reasoning layer and a configurable **execution harness** the execution hub. OpenCode is the default harness; Codex CLI, Claude Code, Cursor CLI, and Copilot CLI are selectable through one config file.
 
-Codex decides what *correct* means (objective, scope, architecture, constraints, acceptance criteria) and sends one structured **Execution Brief** through the bridge. OpenCode executes it — routed by **Jev**, orchestrated by **OMO** when needed — and returns a compact **Result Contract**. Codex verifies the actual result and either passes, corrects, or decides.
+Codex decides what *correct* means (objective, scope, architecture, constraints, acceptance criteria) and sends one structured **Execution Brief** through the bridge. The selected harness executes it and returns a compact **Result Contract**. Codex verifies the actual result and either passes, corrects, or decides. Pure mode runs without OMO/Jev; Jev routing is an optional enhancement.
 
 ## What it does
 
 - Exposes exactly 7 MCP tools to Codex under the `codex_x_opencode_mcp` namespace:
-  `opencode_execute`, `opencode_status`, `opencode_result`, `opencode_inspect`,
-  `opencode_correct`, `opencode_decision`, `opencode_stop`.
-- Carries an Execution Brief (task + scope + architecture + acceptance criteria) to an
-  OpenCode runtime over localhost HTTP, then returns status and a Result Contract.
-- Runs a Jev routing gate inside the managed OpenCode process before every agent turn
-  and stores the `Jev Decision` receipt; results without a matching receipt are rejected.
+  `harness_execute`, `harness_status`, `harness_result`, `harness_inspect`,
+  `harness_correct`, `harness_decision`, `harness_stop`. The older `opencode_*` names
+  remain as deprecated aliases.
+- Carries an Execution Brief (task + scope + architecture + acceptance criteria) to the
+  selected harness, OpenCode over localhost HTTP or a configured CLI process, then
+  returns status and a Result Contract.
+- Injects one vendor-neutral orchestration protocol into every harness prompt: intake,
+  plan, plan review, bounded delegation, smallest change, real verification, independent
+  diff review, iterate until green, report only evidence. Ten roles are bound to model
+  tiers of the harness that actually runs the task; profile, parallel limit, role names,
+  and role tiers are configurable.
+- In non-pure deployments, runs a Jev routing gate inside the managed OpenCode process
+  before every agent turn and stores the `Jev Decision` receipt; results without a
+  matching receipt are rejected.
 - After the final result, shows one `Jev Estimate` block (absolute Codex tokens saved /
   context avoided) from a genuine estimate source, or `unavailable` when none exists.
-- Supports correction and decision loops: Codex sends the delta, OpenCode resumes.
+- Supports correction and decision loops: Codex sends the delta, the harness resumes or
+  replays.
+- Multi-harness execution: the same brief can run on OpenCode (default), Codex CLI,
+  Claude Code, Cursor CLI, Copilot CLI, or Command Code, selected through
+  `harness.config.json` (default/fallback, model tiers, cost cap, pure mode). OpenCode
+  is started only when it is the default harness, part of the fallback chain, or reached
+  through `OPENCODE_BASE_URL`, so a CLI-only deployment needs no OpenCode install. See
+  the [Multi-harness section in bridge/README.md](bridge/README.md#multi-harness).
 - Can discover missing capability candidates from the official MCP registry; npm packages
   with pinned versions install only after your explicit approval, disabled-first with a
   connection health-check.
@@ -24,6 +39,8 @@ Codex decides what *correct* means (objective, scope, architecture, constraints,
 
 See [`bridge/README.md`](bridge/README.md) for the full implementation status and
 [`codex-opencode-execution-hub-prd.md`](codex-opencode-execution-hub-prd.md) for the architecture spec.
+A distributable skill package (SKILL.md, references, and agent metadata) lives in
+[`release/codex-x-opencode-mcp`](release/codex-x-opencode-mcp).
 
 ## Architecture and real workflow
 
@@ -40,8 +57,8 @@ Sisyphus / OMO / specialist agents (each uses its own configured model binding)
   ↓ validation + artifacts + Result Contract
 Codex quality gate
   ├── PASS → done
-  ├── CORRECTION → opencode_correct → OpenCode executes again
-  └── DECISION → opencode_decision → OpenCode resumes
+  ├── CORRECTION → harness_correct → OpenCode executes again
+  └── DECISION → harness_decision → OpenCode resumes
 ```
 
 Key facts:
@@ -51,7 +68,7 @@ Key facts:
   model binding in the OpenCode/OMO configuration.
 - `jev-gate` is an **OpenCode plugin hook**, not the hub. The hub is the MCP server.
   ACP (Agent Client Protocol) is **not** used here.
-- Every `opencode_execute` call must include an absolute `workspace_root`. The bridge
+- Every `harness_execute` call must include an absolute `workspace_root`. The bridge
   canonicalizes it and rejects the brief before creating a session when it is missing
   or invalid. The bridge never falls back to another workspace.
 - After a Codex restart, open a **new Codex task** so the freshly registered
@@ -61,7 +78,7 @@ Key facts:
 
 | Requirement | Notes |
 |---|---|
-| Windows 10/11 | Validated on Windows 11. macOS/Linux are **not** validated — no install steps are claimed for them. |
+| Windows 10/11 | Validated on Windows 11. macOS/Linux are **not** validated - no install steps are claimed for them. |
 | Node.js 22+ | Validated with Node v24. `node --version` must report 22 or newer. |
 | OpenCode 1.18.32 | The implementation target. Verify with `opencode --version`. The managed runtime is started automatically by the bridge. |
 | OpenCode authentication + OMO/Jev/agent configuration | The bridge does not provision these. Your OpenCode setup must already be authenticated and configured with OMO, Jev, agents, and model bindings (see [`codex-handoff-prompt.md`](codex-handoff-prompt.md) for the expected shape). |
@@ -89,7 +106,7 @@ Key facts:
 1. Clone the repository and enter it:
 
    ```powershell
-   git clone https://github.com/<you>/codex-x-opencode-mcp.git
+   git clone https://github.com/IrfanSabrian/codex-x-opencode-mcp.git
    cd codex-x-opencode-mcp
    ```
 
@@ -113,14 +130,14 @@ Key facts:
      points at the installed `dist\index.js` and sets `OPENCODE_WORKSPACE` to the
      installed directory (preserving `OPENCODE_HUB_JEV_ESTIMATE` and every unrelated
      section). A backup is written next to the config.
-   - The installer resolves your home directory at runtime — it never hardcodes a
+   - The installer resolves your home directory at runtime - it never hardcodes a
      username or drive letter.
 
 3. **Restart Codex**, then open a **new task** so the `codex_x_opencode_mcp` tools load.
    Verify the namespace is present before sending any brief.
 
 4. Confirm the installed runtime no longer depends on the source checkout by deleting
-   or renaming the clone later — the MCP server must keep working. (The clone remains
+   or renaming the clone later - the MCP server must keep working. (The clone remains
    the source of truth for updates; see below.)
 
 ## Configuration
@@ -130,17 +147,18 @@ Only one Codex-side block matters:
 ```toml
 [mcp_servers.codex_x_opencode_mcp]
 command = 'C:\Program Files\nodejs\node.exe'
-args = ['C:\Users\<you>\.codex\codex-x-opencode-mcp\dist\index.js']
+args = ['<user-home>\.codex\codex-x-opencode-mcp\dist\index.js']
 
 [mcp_servers.codex_x_opencode_mcp.env]
-OPENCODE_WORKSPACE = 'C:\Users\<you>\.codex\codex-x-opencode-mcp'
+OPENCODE_WORKSPACE = '<user-home>\.codex\codex-x-opencode-mcp'
 OPENCODE_HUB_JEV_ESTIMATE = '1'
 ```
 
 - `command` is your Node.js executable (detected from `PATH` at install time).
 - `OPENCODE_WORKSPACE` is the durable install directory (task state lives under
-  `.codex-x-opencode-mcp/` inside it). Per-task workspaces still come from each
-  brief's `workspace_root`.
+  `.codex-x-opencode-mcp/` inside it). `BRIDGE_WORKSPACE` is the preferred name and
+  takes precedence; the installer keeps writing the legacy key. Per-task workspaces
+  still come from each brief's `workspace_root`.
 - `OPENCODE_HUB_JEV_ESTIMATE=1` enables the genuine Jev Estimate call. Remove it or
   set `0` to go back to `unavailable` estimates.
 - To point at an externally managed OpenCode server instead, set `OPENCODE_BASE_URL`
@@ -170,8 +188,8 @@ It only touches that one directory, so unrelated global skills are preserved.
   -a opencode -g -y` to install globally for OpenCode); UI work →
   **ui-skills.com** (`npx ui-skills categories`, `npx ui-skills list --category
   <cat>`, `npx ui-skills get <skill>`, then copy the reviewed files into the
-  global skill directory — never its MCP endpoint).
-  Catalogs are untrusted indexes — a hit is a lead for review, never a trusted
+  global skill directory - never its MCP endpoint).
+  Catalogs are untrusted indexes - a hit is a lead for review, never a trusted
   install instruction. No live catalog installs happen during repository install.
 - **Mandatory trust review:** before any install, verify the author repository
   URL and inspect the actual `SKILL.md`. Reject the candidate and try the next
@@ -190,7 +208,7 @@ It only touches that one directory, so unrelated global skills are preserved.
   `installedAt` (`YYYY-MM-DD`), and `validation` (one-line trust-review
   outcome). The installer seeds this index only when absent. Reuse it on later
   tasks: check the index, then load the installed `SKILL.md` before execution.
-- **Boundary:** MCP installation approval stays separate — a new MCP
+- **Boundary:** MCP installation approval stays separate - a new MCP
   installation always stops for explicit Codex/user approval, even when the
   skill itself passed trust review.
 
@@ -208,8 +226,9 @@ Then run the project checks from the repository clone:
 
 ```powershell
 cd bridge
-npm test            # full bridge test suite (83 tests)
+npm test            # full bridge test suite
 npm run build       # TypeScript build
+npm run build:schemas  # regenerate the JSON schemas
 node scripts/stdio-smoke.mjs   # MCP handshake + exactly 7 tools
 ```
 
@@ -218,23 +237,28 @@ provider (may use provider tokens).
 
 ## Usage
 
-In Codex, every actionable task — including small ones — goes through the bridge:
+In Codex, the bridge is opt-in. Codex handles requests directly by default. When
+the user explicitly asks to use Codex X OpenCode or OpenCode for the current
+request, the workflow is:
 
 1. Codex writes an Execution Brief (objective, scope, architecture, constraints,
    acceptance criteria, `workspace_root` = the active workspace's absolute path).
-2. Codex calls `opencode_execute`. The reply is a compact `task_id` plus the
+2. Codex calls `harness_execute`. The reply is a compact `task_id` plus the
    `Jev Decision` trace, shown verbatim.
-3. Codex polls `opencode_status` and reads `opencode_result` (compact Result Contract).
-   Large diffs/evidence/logs are fetched lazily with `opencode_inspect`.
+3. Codex polls `harness_status` and reads `harness_result` (compact Result Contract).
+   Large diffs/evidence/logs are fetched lazily with `harness_inspect`.
 4. Codex verifies the result against the acceptance criteria:
    - pass → done (the final result carries one `Jev Estimate` block);
-   - fail → `opencode_correct` with failed criteria, evidence, and retests;
-   - ambiguity → answer via `opencode_decision` (user preference goes through
+   - fail → `harness_correct` with failed criteria, evidence, and retests;
+   - ambiguity → answer via `harness_decision` (user preference goes through
      Codex's interactive choices; 5-minute silence falls back to the recommended option).
-5. `opencode_stop` cancels a running task.
+5. `harness_stop` cancels a running task.
 
-Pure conversation and explanations stay in Codex. If the bridge is unavailable, Codex
-must say so instead of silently doing the work itself.
+The request to use OpenCode applies only to that request. The connector remains
+installed and ready, but its presence does not activate routing. If the bridge
+is unavailable or stale for an explicitly delegated request, Codex first
+attempts managed recovery/restart when possible; if still blocked, Codex must
+state the exact blocker instead of silently doing that delegated work itself.
 
 ## Troubleshooting
 
@@ -242,11 +266,11 @@ must say so instead of silently doing the work itself.
 |---|---|
 | `codex_x_opencode_mcp` tools missing in Codex | Restart Codex and open a **new task**. The tool list loads at session start. |
 | `OPENCODE_WORKSPACE is required` | The MCP env block lost `OPENCODE_WORKSPACE`. Re-run the installer. |
-| `workspace_missing` rejection | The brief omitted `workspace_root` or it is not an existing absolute directory. Fix the brief — the bridge fails closed by design. |
+| `workspace_missing` rejection | The brief omitted `workspace_root` or it is not an existing absolute directory. Fix the brief - the bridge fails closed by design. |
 | `jev_route_missing` | The managed OpenCode process did not produce a Jev receipt (hook misconfigured or external server without `OPENCODE_HUB_ROUTE_DIR`). Check the bridge-managed runtime first. |
 | Tests fail after `npm ci` | Ensure Node.js 22+ (`node --version`) and re-run `npm run build`. Do not hand-edit `dist/`. |
 | Config broken after install | Restore the backup next to `config.toml` (`config.toml.bak-codex-x-opencode-mcp`), then re-run the installer and report the diff. |
-| Old workspace path still referenced | Search the config for the old drive path; only `[mcp_servers.codex_x_opencode_mcp]` should have changed. Re-run the installer — it rewrites that block idempotently. |
+| Old workspace path still referenced | Search the config for the old drive path; only `[mcp_servers.codex_x_opencode_mcp]` should have changed. Re-run the installer - it rewrites that block idempotently. |
 
 ## Update
 
@@ -274,7 +298,7 @@ directory is left untouched.
   assumed.
 - The `specialist/ultrabrain` path is proven by one live scenario (three parallel OMO
   reviews + a valid Result Contract), not by exhaustive coverage of every task shape.
-- MCP connection leases apply per server process — there is no per-agent tool
+- MCP connection leases apply per server process - there is no per-agent tool
   isolation in the bridge; agent permission boundaries must come from OpenCode/OMO config.
 - Tasks without a Result Contract 30 minutes after the cycle starts are marked failed
   (a late valid contract can still recover the status).

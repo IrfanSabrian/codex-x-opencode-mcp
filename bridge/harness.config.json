@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "pure_mode": true,
+  "route_receipts_required": false,
+  "harness": {
+    "default": "opencode",
+    "fallback": ["codex-cli", "claude-code"],
+    "routing": {
+      "by_mode": { "quick": "cheap", "standard": "standard", "full": "strong", "specialist": "strong", "research": "standard", "tool-heavy": "standard" },
+      "escalate_on": ["validation_failed", "invalid_result_contract"],
+      "escalate_to": "strong"
+    }
+  },
+  "limits": { "cycle_timeout_ms": 1800000, "first_output_timeout_ms": 300000, "max_parallel_tasks": 2, "max_cost_usd_per_task": 5.0, "max_stdout_bytes": 8388608, "max_prompt_inline_bytes": 65536 },
+  "orchestration": { "profile": "orchestrated", "max_parallel_agents": 4, "role_names": {} },
+  "harnesses": {
+    "opencode": { "enabled": true, "binary": "opencode", "models": { "cheap": "", "standard": "", "strong": "" }, "serve": { "supported_versions": ["1.18.32"], "strict_version": true, "hostname": "127.0.0.1" }, "plugins": { "jev_gate": false }, "structured_output": true },
+    "codex-cli": { "enabled": true, "binary": "codex", "models": { "cheap": "", "standard": "", "strong": "" }, "sandbox": "workspace-write", "skip_git_repo_check": true, "auth": { "mode": "api_key", "env": "CODEX_API_KEY" } },
+    "claude-code": { "enabled": true, "binary": "claude", "models": { "cheap": "", "standard": "", "strong": "" }, "permission_mode": "acceptEdits", "allowed_tools": ["Read", "Edit", "Write", "Glob", "Grep", "Bash"], "auth": { "mode": "api_key", "env": "ANTHROPIC_API_KEY" } },
+    "cursor-cli": { "enabled": false, "binary": "agent", "models": { "cheap": "", "standard": "", "strong": "" }, "bypass_approval": false, "auth": { "mode": "api_key", "env": "CURSOR_API_KEY" } },
+    "copilot-cli": { "enabled": false, "binary": "copilot", "models": { "cheap": "", "standard": "", "strong": "" }, "allow_all_tools": false, "auth": { "mode": "token", "env": "GITHUB_TOKEN" } },
+    "commandcode": { "enabled": false, "binary": "commandcode", "models": { "cheap": "", "standard": "", "strong": "" }, "permission_mode": "accept-edits", "max_turns": 100, "auth": { "mode": "api_key", "env": "COMMAND_CODE_API_KEY" } }
+  }
+}

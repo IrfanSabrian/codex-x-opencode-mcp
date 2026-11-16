@@ -21,31 +21,31 @@ function fakeRuntime(initial: Record<string, string>) {
 const registry = loadCapabilityRegistry();
 
 test('uses live status and leaves preexisting connections alone', async () => {
-  const runtime = fakeRuntime({ playwright: 'connected', 'autocad-live': 'disabled' });
+  const runtime = fakeRuntime({ playwright: 'connected', 'postgres-mcp': 'disabled' });
   const manager = new CapabilityManager(runtime.api, registry);
-  assert.deepEqual(await manager.activate('task-1', ['browser-automation', 'autocad']), {
-    task_id: 'task-1', providers: ['playwright', 'autocad-live'], newly_connected: ['autocad-live']
+  assert.deepEqual(await manager.activate('task-1', ['browser-automation', 'database-schema-inspection']), {
+    task_id: 'task-1', providers: ['playwright', 'postgres-mcp'], newly_connected: ['postgres-mcp']
   });
-  assert.deepEqual(await manager.release('task-1'), ['autocad-live']);
-  assert.deepEqual(runtime.calls, ['connect:autocad-live', 'disconnect:autocad-live']);
+  assert.deepEqual(await manager.release('task-1'), ['postgres-mcp']);
+  assert.deepEqual(runtime.calls, ['connect:postgres-mcp', 'disconnect:postgres-mcp']);
 });
 
 test('shares a bridge-owned connection until the last task releases it', async () => {
-  const runtime = fakeRuntime({ 'autocad-live': 'disabled' });
+  const runtime = fakeRuntime({ 'postgres-mcp': 'disabled' });
   const manager = new CapabilityManager(runtime.api, registry);
-  await manager.activate('task-1', ['autocad']);
-  await manager.activate('task-2', ['autocad']);
+  await manager.activate('task-1', ['database-schema-inspection']);
+  await manager.activate('task-2', ['database-schema-inspection']);
   assert.deepEqual(await manager.release('task-1'), []);
-  assert.deepEqual(await manager.release('task-2'), ['autocad-live']);
-  assert.deepEqual(runtime.calls, ['connect:autocad-live', 'disconnect:autocad-live']);
+  assert.deepEqual(await manager.release('task-2'), ['postgres-mcp']);
+  assert.deepEqual(runtime.calls, ['connect:postgres-mcp', 'disconnect:postgres-mcp']);
 });
 
 test('rejects unknown, absent, and unaudited providers before any connection', async () => {
-  const runtime = fakeRuntime({ 'autocad-live': 'disabled', 'claude-mem:mcp-search': 'connected' });
+  const runtime = fakeRuntime({ 'postgres-mcp': 'disabled', github: 'connected' });
   const manager = new CapabilityManager(runtime.api, registry);
-  await assert.rejects(() => manager.activate('task-1', ['autocad', 'postgresql']), (error: unknown) => {
+  await assert.rejects(() => manager.activate('task-1', ['database-schema-inspection', 'redis']), (error: unknown) => {
     assert.ok(error instanceof CapabilityUnavailableError);
-    assert.deepEqual(error.issues, [{ capability: 'postgresql', reason: 'no_installed_provider' }]);
+    assert.deepEqual(error.issues, [{ capability: 'redis', reason: 'no_installed_provider' }]);
     return true;
   });
   assert.deepEqual(runtime.calls, []);
@@ -169,23 +169,23 @@ test('re-registers a previously approved MCP with OpenCode after a runtime resta
 });
 
 test('rolls back connections if a later activation fails', async () => {
-  const runtime = fakeRuntime({ 'autocad-live': 'disabled', pencil: 'disabled' });
+  const runtime = fakeRuntime({ 'postgres-mcp': 'disabled', 'example-mcp': 'disabled' });
   runtime.api.connect = async name => {
     runtime.calls.push(`connect:${name}`);
-    if (name === 'pencil') return false;
+    if (name === 'example-mcp') return false;
     runtime.state[name] = 'connected';
     return true;
   };
   const manager = new CapabilityManager(runtime.api, registry);
-  await assert.rejects(() => manager.activate('task-1', ['autocad', 'design-editing']), /Failed to connect MCP provider/);
-  assert.deepEqual(runtime.calls, ['connect:autocad-live', 'connect:pencil', 'disconnect:autocad-live']);
+  await assert.rejects(() => manager.activate('task-1', ['database-schema-inspection', 'example-capability']), /Failed to connect MCP provider/);
+  assert.deepEqual(runtime.calls, ['connect:postgres-mcp', 'connect:example-mcp', 'disconnect:postgres-mcp']);
   assert.deepEqual(await manager.release('task-1'), []);
 });
 
 test('keeps a failed disconnect available for cleanup retry', async () => {
-  const runtime = fakeRuntime({ 'autocad-live': 'disabled' });
+  const runtime = fakeRuntime({ 'postgres-mcp': 'disabled' });
   const manager = new CapabilityManager(runtime.api, registry);
-  await manager.activate('task-1', ['autocad']);
+  await manager.activate('task-1', ['database-schema-inspection']);
   let attempts = 0;
   runtime.api.disconnect = async name => {
     attempts++;
@@ -196,8 +196,29 @@ test('keeps a failed disconnect available for cleanup retry', async () => {
   };
   assert.deepEqual(await manager.release('task-1'), []);
   assert.equal(manager.hasLease('task-1'), true);
-  assert.deepEqual(await manager.release('task-1'), ['autocad-live']);
+  assert.deepEqual(await manager.release('task-1'), ['postgres-mcp']);
   assert.equal(manager.hasLease('task-1'), false);
+});
+
+test('native file capabilities resolve without an MCP provider or registry lookup', async () => {
+  const runtime = fakeRuntime({ playwright: 'connected' });
+  let searches = 0;
+  const discovery: McpDiscovery = { search: async () => { searches++; return []; } };
+  const manager = new CapabilityManager(runtime.api, registry, discovery);
+  assert.deepEqual(await manager.activate('native-1', ['read_files', 'edit_files']), {
+    task_id: 'native-1', providers: [], newly_connected: []
+  });
+  assert.equal(searches, 0);
+  assert.deepEqual(runtime.calls, []);
+  assert.deepEqual(await manager.release('native-1'), []);
+});
+
+test('mixed native and external capabilities resolve only the external part via MCP', async () => {
+  const runtime = fakeRuntime({ playwright: 'connected' });
+  const manager = new CapabilityManager(runtime.api, registry);
+  const lease = await manager.activate('mixed-1', ['read_files', 'browser-automation']);
+  assert.deepEqual(lease, { task_id: 'mixed-1', providers: ['playwright'], newly_connected: [] });
+  assert.deepEqual(await manager.release('mixed-1'), []);
 });
 
 test('HTTP adapter uses the existing local MCP routes and workspace', async () => {
@@ -215,11 +236,11 @@ test('HTTP adapter uses the existing local MCP routes and workspace', async () =
     const api = new HttpMcpRuntimeApi('http://127.0.0.1:4096', 'E:/workspace');
     await api.statuses();
     await api.add('codex_hub_postgresql_1234567890', { type: 'local', command: ['npx', '--yes', '@example/postgresql@1.2.3'] });
-    await api.connect('claude-mem:mcp-search');
-    await api.disconnect('claude-mem:mcp-search');
+    await api.connect('postgres-mcp');
+    await api.disconnect('postgres-mcp');
     assert.deepEqual(calls.map(call => [call.method, call.url.pathname]), [
-      ['GET', '/mcp'], ['POST', '/mcp'], ['POST', '/mcp/claude-mem%3Amcp-search/connect'],
-      ['POST', '/mcp/claude-mem%3Amcp-search/disconnect']
+      ['GET', '/mcp'], ['POST', '/mcp'], ['POST', '/mcp/postgres-mcp/connect'],
+      ['POST', '/mcp/postgres-mcp/disconnect']
     ]);
     assert.ok(calls.every(call => call.url.searchParams.get('directory') === 'E:/workspace'));
     assert.deepEqual(calls[1].body, {

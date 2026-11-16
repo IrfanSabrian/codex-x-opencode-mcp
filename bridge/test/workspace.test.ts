@@ -159,7 +159,7 @@ test('CapabilityManager.scoped runs capability checks in the task workspace', as
   const log: string[] = [];
   const apiFor = (workspace: string) => ({
     forWorkspace: (ws: string) => apiFor(ws),
-    statuses: async () => { log.push(`statuses:${workspace}`); return {}; },
+    statuses: async () => { log.push(`statuses:${workspace}`); return { playwright: { status: 'connected' } }; },
     add: async () => true,
     connect: async () => true,
     disconnect: async () => true
@@ -167,9 +167,26 @@ test('CapabilityManager.scoped runs capability checks in the task workspace', as
   const dirB = mkdtempSync(join(tmpdir(), 'hub-ws-'));
   const manager = new CapabilityManager(apiFor(tmpdir()) as never);
   const scoped = manager.scoped(dirB);
-  await scoped.activate('ws-task', []);
+  await scoped.activate('ws-task', ['browser-automation']);
   assert.ok(log.some(entry => entry === `statuses:${dirB}`));
   assert.equal(manager.hasLease('ws-task'), false);
+});
+
+test('CapabilityManager.scoped resolves native file capabilities without MCP status checks', async () => {
+  const log: string[] = [];
+  const apiFor = (workspace: string) => ({
+    forWorkspace: (ws: string) => apiFor(ws),
+    statuses: async () => { log.push(`statuses:${workspace}`); return {}; },
+    add: async () => true,
+    connect: async () => true,
+    disconnect: async () => true
+  });
+  const dirB = mkdtempSync(join(tmpdir(), 'hub-ws-'));
+  const scoped = new CapabilityManager(apiFor(tmpdir()) as never).scoped(dirB);
+  assert.deepEqual(await scoped.activate('ws-native', ['read_files', 'edit_files']), {
+    task_id: 'ws-native', providers: [], newly_connected: []
+  });
+  assert.deepEqual(log, []);
 });
 
 test('WorkspaceValidationRunner.forWorkspace roots checks in the task workspace', async () => {

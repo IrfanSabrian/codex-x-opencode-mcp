@@ -16,7 +16,23 @@ export const registrySchema = z.strictObject({
 });
 
 export type CapabilityRegistry = z.infer<typeof registrySchema>;
+/**
+ * OpenCode-native capabilities satisfied by the built-in OpenCode runtime
+ * tools (read/write/edit/bash over the task workspace). These never require
+ * an external MCP registry provider. `read_files`/`edit_files` are the
+ * generic Codex names for local file reads/edits and belong here.
+ */
+export const OPENCODE_NATIVE_CAPABILITIES: ReadonlySet<string> = new Set([
+  'read_files',
+  'edit_files'
+]);
+
+export function isNativeCapability(capability: string): boolean {
+  return OPENCODE_NATIVE_CAPABILITIES.has(capability.trim().toLowerCase());
+}
+
 export type CapabilityResolution =
+  | { capability: string; status: 'native'; provider: 'opencode-native' }
   | { capability: string; status: 'ready'; provider: string; alternatives: string[] }
   | { capability: string; status: 'disabled'; providers: string[] }
   | { capability: string; status: 'missing'; reason: 'no_registered_mcp_provider' };
@@ -31,6 +47,9 @@ export function loadCapabilityRegistry(path: URL = new URL('../config/registry.j
 export function resolveCapability(capability: string, registry: CapabilityRegistry): CapabilityResolution {
   const normalized = capability.trim().toLowerCase();
   if (!normalized) throw new Error('Capability is required');
+  if (isNativeCapability(normalized)) {
+    return { capability: normalized, status: 'native', provider: 'opencode-native' };
+  }
 
   const matches = registry.providers.filter(provider => provider.capabilities.includes(normalized));
   const connected = matches.filter(provider => provider.status === 'connected');

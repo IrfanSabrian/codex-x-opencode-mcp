@@ -24,16 +24,19 @@ test('MCP server exposes exactly the seven bridge tools and delegates a validate
     await client.connect(clientTransport);
 
     const tools = await client.listTools();
-    assert.deepEqual(tools.tools.map(tool => tool.name), [
-      'opencode_execute', 'opencode_status', 'opencode_result', 'opencode_inspect',
-      'opencode_correct', 'opencode_decision', 'opencode_stop'
-    ]);
-    assert.match(tools.tools.find(tool => tool.name === 'opencode_execute')?.description ?? '', /display that text verbatim immediately/);
-    assert.match(tools.tools.find(tool => tool.name === 'opencode_execute')?.description ?? '', /every actionable task.*including small/i);
-    assert.match(tools.tools.find(tool => tool.name === 'opencode_result')?.description ?? '', /Jev Estimate block/);
-    assert.match(tools.tools.find(tool => tool.name === 'opencode_result')?.description ?? '', /show.*question.*options.*Codex decision/i);
-    assert.match(tools.tools.find(tool => tool.name === 'opencode_decision')?.description ?? '', /show.*question.*selected answer.*rationale/i);
-    const executeSchema = tools.tools.find(tool => tool.name === 'opencode_execute')?.inputSchema as {
+    assert.deepEqual(tools.tools.map(tool => tool.name).sort(), [
+      'harness_correct', 'harness_decision', 'harness_execute', 'harness_inspect',
+      'harness_result', 'harness_status', 'harness_stop',
+      'opencode_correct', 'opencode_decision', 'opencode_execute', 'opencode_inspect',
+      'opencode_result', 'opencode_status', 'opencode_stop'
+    ].sort());
+    assert.match(tools.tools.find(tool => tool.name === 'harness_execute')?.description ?? '', /display that text verbatim immediately/);
+    assert.match(tools.tools.find(tool => tool.name === 'harness_execute')?.description ?? '', /configured execution harness/i);
+    assert.match(tools.tools.find(tool => tool.name === 'harness_result')?.description ?? '', /Jev Estimate block/);
+    assert.match(tools.tools.find(tool => tool.name === 'harness_result')?.description ?? '', /show.*question.*options.*decision/i);
+    assert.match(tools.tools.find(tool => tool.name === 'harness_decision')?.description ?? '', /show.*question.*selected answer.*rationale/i);
+    assert.match(tools.tools.find(tool => tool.name === 'opencode_execute')?.description ?? '', /Deprecated alias of harness_execute/i);
+    const executeSchema = tools.tools.find(tool => tool.name === 'harness_execute')?.inputSchema as {
       properties?: Record<string, unknown>; required?: string[];
     };
     assert.ok(executeSchema?.properties && 'workspace_root' in executeSchema.properties);
@@ -198,8 +201,43 @@ test('MCP returns an exact approval retry instruction when OpenCode lacks a capa
       candidates: { postgresql: [candidate] },
       installation_policy: 'propose_and_request_user_approval',
       approval_field: 'approved_mcp_installation_keys',
-      next_action: 'Show the exact candidate and command to the user; after explicit approval, retry opencode_execute with its approval_key.'
+      next_action: 'Show the exact candidate and command to the user; after explicit approval, retry harness_execute with its approval_key.'
     });
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
+test('MCP explains empty registry candidates without implying an install is available', async () => {
+  const hub = {
+    execute: async () => { throw new CapabilityUnavailableError(
+      [{ capability: 'some-obscure-capability', reason: 'no_installed_provider' }], {}
+    ); }
+  } as unknown as Hub;
+  const server = createMcpServer(hub);
+  const client = new Client({ name: 'bridge-test', version: '1.0.0' });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  try {
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    const result = await client.callTool({ name: 'opencode_execute', arguments: {
+      task: { task_id: 'oc_1', parent_task_id: null, mode: 'quick', requested_by: 'user' },
+      objective: 'Use an obscure capability', scope: { in_scope: ['work'], out_of_scope: [] },
+      context: 'test', current_state: 'missing MCP', architecture: { decisions: [], rationale: [] },
+      decisions_already_made: [], decision_rationale: [], requirements: ['Work'], constraints: [],
+      forbidden_changes: [], required_capabilities: ['some-obscure-capability'], execution_hints: [], acceptance_criteria: ['report'],
+      validation_requirements: [], expected_artifacts: [], known_risks: [], open_questions: [],
+      decision_policy: { opencode_may_decide: [], must_ask_codex: [] },
+      workspace_root: tmpdir()
+    } });
+    assert.equal(result.isError, true);
+    const payload = JSON.parse((result.content?.[0] as { text: string }).text);
+    assert.equal(payload.error, 'capability_unavailable');
+    assert.equal(payload.reason, 'no_registry_candidates');
+    assert.match(payload.message, /no installable candidates/i);
+    assert.match(payload.next_action, /No MCP was installed/);
+    assert.ok(!('approval_field' in payload));
   } finally {
     await client.close();
     await server.close();
@@ -221,7 +259,7 @@ test('MCP tells Codex to refresh a proposal when an approval key has gone stale'
     assert.deepEqual(JSON.parse((result.content?.[0] as { text: string }).text), {
       error: 'mcp_install_approval_invalid',
       message: 'Approval key no longer matches the registry candidate',
-      next_action: 'Retry opencode_execute without approval keys to get the current candidate, then ask the user again.'
+      next_action: 'Retry harness_execute without approval keys to get the current candidate, then ask the user again.'
     });
   } finally {
     await client.close();

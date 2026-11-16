@@ -1,0 +1,335 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "pure_mode": {
+      "type": "boolean"
+    },
+    "route_receipts_required": {
+      "type": "boolean"
+    },
+    "harness": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "string",
+          "enum": [
+            "opencode",
+            "claude-code",
+            "codex-cli",
+            "copilot-cli",
+            "cursor-cli",
+            "commandcode"
+          ]
+        },
+        "fallback": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "opencode",
+              "claude-code",
+              "codex-cli",
+              "copilot-cli",
+              "cursor-cli",
+              "commandcode"
+            ]
+          }
+        },
+        "routing": {
+          "type": "object",
+          "properties": {
+            "by_mode": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "enum": [
+                  "quick",
+                  "standard",
+                  "full",
+                  "specialist",
+                  "research",
+                  "tool-heavy"
+                ]
+              },
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "cheap",
+                  "standard",
+                  "strong"
+                ]
+              }
+            },
+            "escalate_on": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "escalate_to": {
+              "type": "string",
+              "enum": [
+                "cheap",
+                "standard",
+                "strong"
+              ]
+            }
+          },
+          "required": [
+            "by_mode",
+            "escalate_on",
+            "escalate_to"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "default",
+        "fallback",
+        "routing"
+      ],
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "cycle_timeout_ms": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "first_output_timeout_ms": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_parallel_tasks": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_cost_usd_per_task": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_stdout_bytes": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_prompt_inline_bytes": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "cycle_timeout_ms",
+        "first_output_timeout_ms",
+        "max_parallel_tasks",
+        "max_cost_usd_per_task",
+        "max_stdout_bytes",
+        "max_prompt_inline_bytes"
+      ],
+      "additionalProperties": false
+    },
+    "orchestration": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "orchestrated",
+            "minimal",
+            "off"
+          ]
+        },
+        "max_parallel_agents": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "role_names": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "role_models": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "cheap",
+              "standard",
+              "strong"
+            ]
+          }
+        }
+      },
+      "required": [
+        "profile",
+        "max_parallel_agents",
+        "role_names",
+        "role_models"
+      ],
+      "additionalProperties": false
+    },
+    "harnesses": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "opencode",
+          "claude-code",
+          "codex-cli",
+          "copilot-cli",
+          "cursor-cli",
+          "commandcode"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "binary": {
+            "type": "string"
+          },
+          "models": {
+            "type": "object",
+            "properties": {
+              "cheap": {
+                "type": "string"
+              },
+              "standard": {
+                "type": "string"
+              },
+              "strong": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "cheap",
+              "standard",
+              "strong"
+            ],
+            "additionalProperties": false
+          },
+          "auth": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "api_key",
+                  "token",
+                  "oauth",
+                  "none"
+                ]
+              },
+              "env": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mode"
+            ],
+            "additionalProperties": {}
+          },
+          "permission_mode": {
+            "type": "string"
+          },
+          "sandbox": {
+            "type": "string"
+          },
+          "skip_git_repo_check": {
+            "type": "boolean"
+          },
+          "allowed_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "allow_all_tools": {
+            "type": "boolean"
+          },
+          "bypass_approval": {
+            "type": "boolean"
+          },
+          "max_turns": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "structured_output": {
+            "type": "boolean"
+          },
+          "serve": {
+            "type": "object",
+            "properties": {
+              "supported_versions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "strict_version": {
+                "type": "boolean"
+              },
+              "hostname": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "supported_versions",
+              "strict_version",
+              "hostname"
+            ],
+            "additionalProperties": {}
+          },
+          "plugins": {
+            "type": "object",
+            "properties": {
+              "jev_gate": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "jev_gate"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "enabled",
+          "binary",
+          "models"
+        ],
+        "additionalProperties": {}
+      }
+    }
+  },
+  "required": [
+    "version",
+    "pure_mode",
+    "route_receipts_required",
+    "harness",
+    "limits",
+    "orchestration",
+    "harnesses"
+  ],
+  "additionalProperties": {}
+}

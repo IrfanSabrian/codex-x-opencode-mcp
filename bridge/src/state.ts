@@ -1,3 +1,23 @@
+/**
+ * Reasons the bridge may record on a failed task.
+ *
+ * `budget_exceeded` is a policy stop, not a harness fault: the accumulated
+ * reported cost passed `limits.max_cost_usd_per_task`, so no further cycle is
+ * allowed for the task.
+ */
+export type TaskFailureReason =
+  | 'workspace_missing'
+  | 'recovery_exhausted'
+  | 'recovery_prompt_missing'
+  | 'recovery_submission_failed'
+  | 'jev_route_missing'
+  | 'validation_failed'
+  | 'submission_failed'
+  | 'invalid_result_contract'
+  | 'no_assistant_result'
+  | 'no_valid_result_contract'
+  | 'budget_exceeded';
+
 export interface TaskRecord {
   task_id: string;
   session_id: string;
@@ -19,7 +39,19 @@ export interface TaskRecord {
   required_capabilities?: string[];
   capabilities_active?: boolean;
   workspace_root?: string;
-  failure_reason?: string;
+  failure_reason?: TaskFailureReason;
+  // Which harness executed this task and how it was routed. Never returned by
+  // `Hub.status()`; surfaced only through inspect/result provenance.
+  harness_id?: import('./harness/types.js').HarnessID;
+  model_tier?: import('./harness/types.js').ModelTier;
+  model_id?: string;
+  native_session_id?: string;
+  submit_mode?: string;
+  /** Accumulated usage reported by the harness across cycles (cost only). */
+  usage?: import('./harness/types.js').HarnessUsage;
+  /** `cycle_started_at` the accumulated usage was last updated for. */
+  cost_accounted_at?: string;
+  provenance_mode?: 'jev' | 'pure';
   created_at: string;
   updated_at: string;
 }

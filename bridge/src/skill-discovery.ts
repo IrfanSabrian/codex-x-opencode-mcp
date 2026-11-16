@@ -55,7 +55,7 @@ export type SkillFile = {
  *   OpenCode skill directory manually; never use its MCP endpoint here
  *   (no new MCP installs without separate approval).
  * - OpenCode global skills (https://opencode.ai/docs/skills/):
- *   `~/.config/opencode/skills/<name>/SKILL.md` — one folder per skill name,
+ *   `~/.config/opencode/skills/<name>/SKILL.md` - one folder per skill name,
  *   frontmatter `name` must match the directory name. A fresh session may be
  *   required before a newly installed global skill is picked up.
  */

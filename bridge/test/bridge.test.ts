@@ -70,7 +70,7 @@ test('execute sends brief once and returns a compact task receipt', async () => 
   assert.equal(calls.length, 1);
   assert.match(JSON.stringify(calls[0]), /Check the relevant files/);
   assert.match(JSON.stringify(calls[0]), /Codex owns the user task, objective, scope, architecture, requirements, constraints, and acceptance criteria/);
-  assert.match(JSON.stringify(calls[0]), /OpenCode planning agent may only divide approved in-scope work into bounded assignments/);
+  assert.match(JSON.stringify(calls[0]), /harness planning agent may only divide approved in-scope work into bounded assignments/);
   assert.match(JSON.stringify(calls[0]), /return the exact question and options for Codex/);
   assert.equal((calls[0] as any).format, undefined);
   await assert.rejects(() => hub.execute(brief), /already exists/i);
@@ -191,8 +191,8 @@ test('capabilities activate before execution and bridge-owned connections releas
 test('failed MCP disconnect stays marked active for a later retry', async () => {
   let releases = 0;
   const manager = {
-    activate: async () => ({ task_id: 'task-1', providers: ['autocad-live'], newly_connected: ['autocad-live'] }),
-    release: async () => { releases++; return releases === 1 ? [] : ['autocad-live']; },
+    activate: async () => ({ task_id: 'task-1', providers: ['postgres-mcp'], newly_connected: ['postgres-mcp'] }),
+    release: async () => { releases++; return releases === 1 ? [] : ['postgres-mcp']; },
     hasLease: () => releases < 2
   } as unknown as CapabilityManager;
   const client = {
@@ -202,7 +202,7 @@ test('failed MCP disconnect stays marked active for a later retry', async () => 
   const tasks = new Map<string, any>();
   const store = { get: async (id: string) => tasks.get(id), put: async (item: any) => { tasks.set(item.task_id, item); } } as TaskStore;
   const hub = new Hub(client, store, manager);
-  await hub.execute({ ...brief, required_capabilities: ['autocad'] });
+  await hub.execute({ ...brief, required_capabilities: ['database-schema-inspection'] });
   await hub.stop('task-1', 'done');
   assert.equal(tasks.get('task-1').capabilities_active, true);
   await hub.status('task-1');
@@ -306,7 +306,7 @@ test('result retains structured OpenCode custom checks as attributed text', asyn
   const store = { get: async (id: string) => tasks.get(id), put: async (item: any) => { tasks.set(item.task_id, item); } } as TaskStore;
   const hub = new Hub(client, store);
   await hub.execute(brief);
-  assert.match((await hub.result('task-1')).validation.custom_checks[0], /^OpenCode reported:/);
+  assert.match((await hub.result('task-1')).validation.custom_checks[0], /^harness reported:/);
 });
 
 test('bridge reports an in-flight sync request as executing even when OpenCode status is empty', async () => {
