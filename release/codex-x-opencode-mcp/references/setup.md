@@ -116,7 +116,9 @@ section 6.
 
 1. Restart Codex.
 2. Open a new task. The MCP tool list loads at task start, not on demand.
-3. Confirm the namespace `codex_x_opencode_mcp` and its seven tools are listed.
+3. Confirm the namespace `codex_x_opencode_mcp` and its seven tools are listed. Each tool
+   also appears under a deprecated `opencode_*` alias, so a client that lists both forms
+   is showing 14 entries for the same seven tools.
 
 Protocol-level check, without touching Codex:
 

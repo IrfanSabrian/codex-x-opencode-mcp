@@ -74,6 +74,35 @@ The installer is idempotent. It copies the bridge to
 rewrites only the `[mcp_servers.codex_x_opencode_mcp]` block in
 `%USERPROFILE%\.codex\config.toml`, keeping a backup next to it.
 
+## Compatibility
+
+Any MCP-capable orchestrator can drive any of the six harnesses, because the bridge speaks MCP over stdio. What differs is how each harness behaves, so the capability matrix below is per harness, not per pair.
+
+| Orchestrator | How it registers the bridge | Status |
+| --- | --- | --- |
+| Codex CLI | `[mcp_servers.codex_x_opencode_mcp]` in `config.toml` | Validated |
+| Claude Code | `claude mcp add --transport stdio codex-x-opencode-mcp -- node "<install-dir>/bridge/dist/index.js"` | Supported |
+| Cursor | `.cursor/mcp.json` | Supported |
+| GitHub Copilot | `.vscode/mcp.json` | Supported |
+| OpenCode | `opencode.json` under `mcp` | Supported |
+| Any other MCP client | stdio command pointing at `bridge/dist/index.js` | Supported |
+
+Note that only Codex CLI is marked Validated because the other clients are covered by automated tests and documented config, not by an end-to-end run on every release.
+
+| Harness | Resume | Structured result | Subagents for the ten roles | Usage and cost | Default |
+| --- | --- | --- | --- | --- | --- |
+| OpenCode | Yes | JSON schema | Yes, via `task` and configured agents | No | Yes |
+| Claude Code | Yes | JSON schema | Yes, Task tool subagents | Yes | No |
+| Command Code | Yes | None, parsed from `finalText` | Yes, `agent` tool plus `.commandcode/agents/*.md` | Yes | No |
+| Codex CLI | Yes | JSON schema file | Single agent per cycle | Yes | No |
+| Cursor CLI | No, replays compressed transcript | None, parsed from output | Single agent per cycle | No | No |
+| Copilot CLI | No, replays compressed transcript | None, parsed from output | Single agent per cycle | No | No |
+
+Usage means the harness reports token counts and cost. A harness without it still runs every
+task, but the per-task cost cap cannot measure what that task spent.
+
+Each role in the orchestration protocol is bound to a model tier that the selected harness actually offers, so switching harness changes the model ids without changing the protocol; a single-agent harness runs the same ten-role sequence itself and reports it in its summary.
+
 ## Requirements
 
 | Requirement | Notes |
